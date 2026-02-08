@@ -35,12 +35,6 @@ export interface AnimationSettings {
   cameraAutoRotateSpeed: number;
   cameraPreset: 'front' | 'top' | 'side' | 'isometric' | 'custom'; // camera preset positions
 
-  // Effects
-  bloomEnabled: boolean;
-  bloomIntensity: number;
-  motionBlurEnabled: boolean;
-  motionBlurAmount: number;
-
   // Render modes - ASCII
   asciiEnabled: boolean;
   asciiCharset: 'standard' | 'dense' | 'minimal' | 'blocks' | 'braille';

@@ -329,14 +329,6 @@ export function SettingsPanel({
           )}
         </Section>
 
-        {/* Effects */}
-        <Section title="Effects" icon={Sparkles} defaultOpen={false}>
-          <ToggleControl label="Motion Blur" value={settings.motionBlurEnabled} onChange={(v) => update({ motionBlurEnabled: v })} />
-          {settings.motionBlurEnabled && (
-            <SliderControl label="Blur Amount" value={settings.motionBlurAmount} min={0} max={1} step={0.1} onChange={(v) => update({ motionBlurAmount: v })} />
-          )}
-        </Section>
-
         {/* Render Modes */}
         <Section title="Render Modes" icon={Code2} defaultOpen={false}>
           <ToggleControl label="ASCII Effect" value={settings.asciiEnabled} onChange={(v) => update({ asciiEnabled: v })} />

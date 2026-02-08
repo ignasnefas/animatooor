@@ -369,7 +369,7 @@ export const Scene = forwardRef<SceneHandle, SceneProps>(function Scene({ settin
     <div ref={containerRef} className="relative w-full h-full">
       <Canvas
         ref={canvasRef}
-        camera={{ position: [0, 2, settings.cameraDistance], fov: 50 }}
+        camera={{ position: [0, 0, settings.cameraDistance], fov: 50 }}
         gl={{
           preserveDrawingBuffer: true,
           antialias: true,

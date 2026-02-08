@@ -5,6 +5,9 @@ import { applyBayerDithering, applyFloydSteinbergDithering, reduceColorsTopalett
 import { palettes } from '../utils/palettes';
 import { applyPixelation } from '../utils/pixelation';
 
+// @ts-ignore - gif.js doesn't have TypeScript definitions
+import GIF from 'gif.js';
+
 // Calculate bitrate based on resolution and quality
 function calculateBitrate(width: number, height: number, quality: 'good' | 'excellent' | 'maximum', fps: number = 30): number {
   const pixelCount = width * height;
@@ -145,8 +148,151 @@ export function useVideoExport() {
 
       // Handle GIF export separately
       if (settings.exportFormat === 'gif') {
-        // Note: For production GIF support, integrate gif.js library
-        throw new Error('GIF export requires gif.js library installation. Use MP4 or WebM for now.');
+        // Generate frames with effects applied
+        const frames: ImageData[] = [];
+        const targetDuration = settings.loopDuration * settings.exportLoopCount;
+        const targetFrameCount = Math.round(targetDuration * settings.exportFps);
+        const frameIntervalMs = 1000 / settings.exportFps;
+
+        // Create temp canvas for processing
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = settings.exportWidth;
+        tempCanvas.height = settings.exportHeight;
+        const tempCtx = tempCanvas.getContext('2d');
+        if (!tempCtx) throw new Error('Failed to create canvas context');
+
+        // Processing canvas for effects
+        const processScale = 0.5;
+        const processWidth = Math.round(cropWidth * processScale);
+        const processHeight = Math.round(cropHeight * processScale);
+        const processCanvas = document.createElement('canvas');
+        processCanvas.width = processWidth;
+        processCanvas.height = processHeight;
+        const processCtx = processCanvas.getContext('2d', { willReadFrequently: true });
+        if (!processCtx) throw new Error('Failed to create process context');
+
+        for (let i = 0; i < targetFrameCount; i++) {
+          setExportProgress(i / targetFrameCount);
+
+          if (abortRef.current) break;
+
+          // Simulate time progression for animation
+          const currentTime = (i / settings.exportFps) % settings.loopDuration;
+
+          // Wait for frame interval (simulate animation timing)
+          await new Promise(resolve => setTimeout(resolve, frameIntervalMs));
+
+          try {
+            if (settings.asciiEnabled) {
+              // ASCII processing
+              processCtx.drawImage(canvas, cropX, cropY, cropWidth, cropHeight, 0, 0, processWidth, processHeight);
+              const imageData = processCtx.getImageData(0, 0, processWidth, processHeight);
+
+              const frame = imageDataToASCIICells(imageData, processWidth, processHeight, {
+                charset: settings.asciiCharset,
+                resolution: settings.asciiResolution,
+                invert: settings.asciiInvert,
+                contrast: settings.asciiContrast,
+                gamma: settings.asciiGamma,
+                colorMode: settings.asciiColorMode,
+                textColor: settings.asciiTextColor,
+                backgroundColor: settings.backgroundColor,
+              });
+
+              renderASCIIToCanvas(tempCtx, frame, settings.exportWidth, settings.exportHeight, {
+                charset: settings.asciiCharset,
+                resolution: settings.asciiResolution,
+                colorMode: settings.asciiColorMode,
+                textColor: settings.asciiTextColor,
+                backgroundColor: settings.backgroundColor,
+                fontSize: settings.asciiFontSize,
+                fontWeight: settings.asciiFontWeight,
+                textOpacity: settings.asciiOpacity,
+                backgroundOpacity: settings.asciiBackgroundOpacity,
+                brightnessBoost: settings.asciiBrightnessBoost,
+              });
+            } else {
+              // Regular processing with dithering/pixelation
+              processCtx.drawImage(canvas, cropX, cropY, cropWidth, cropHeight, 0, 0, processWidth, processHeight);
+
+              if (settings.ditheringEnabled || (settings.paletteType !== 'full')) {
+                const imageData = processCtx.getImageData(0, 0, processWidth, processHeight);
+                const palette = palettes[settings.paletteType].colors;
+
+                if (settings.ditheringEnabled) {
+                  if (settings.ditheringType === 'bayer') {
+                    applyBayerDithering(imageData.data, processWidth, processHeight, palette, settings.ditheringIntensity, settings.ditheringResolution);
+                  } else {
+                    applyFloydSteinbergDithering(imageData.data, processWidth, processHeight, palette, settings.ditheringIntensity, settings.ditheringResolution);
+                  }
+                } else {
+                  reduceColorsTopalette(imageData.data, palette);
+                }
+
+                processCtx.putImageData(imageData, 0, 0);
+              }
+
+              if (settings.pixelationEnabled && settings.pixelSize > 1) {
+                applyPixelation(processCtx, processCanvas, settings.pixelSize);
+              }
+
+              // Scale to export size
+              tempCtx.drawImage(processCanvas, 0, 0, processWidth, processHeight, 0, 0, settings.exportWidth, settings.exportHeight);
+            }
+
+            // Capture frame
+            const frameData = tempCtx.getImageData(0, 0, settings.exportWidth, settings.exportHeight);
+            frames.push(frameData);
+          } catch (e) {
+            console.warn('Frame capture error:', e);
+          }
+        }
+
+        if (!abortRef.current && frames.length > 0) {
+          // Create GIF using gif.js
+          const gif = new GIF({
+            workers: 2,
+            quality: 10,
+            width: settings.exportWidth,
+            height: settings.exportHeight,
+            workerScript: '/gif.worker.js'
+          });
+
+          frames.forEach(frame => {
+            const canvas = document.createElement('canvas');
+            canvas.width = settings.exportWidth;
+            canvas.height = settings.exportHeight;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.putImageData(frame, 0, 0);
+              gif.addFrame(canvas, { delay: 1000 / settings.exportFps });
+            }
+          });
+
+          gif.on('finished', (blob: Blob) => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `loopforge-${settings.animationType}-${Date.now()}.gif`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            setIsExporting(false);
+            setExportProgress(0);
+          });
+
+          gif.on('progress', (p: number) => {
+            setExportProgress(0.5 + p * 0.5); // 50% for frame generation, 50% for encoding
+          });
+
+          gif.render();
+        } else {
+          setIsExporting(false);
+          setExportProgress(0);
+        }
+
+        return;
       }
 
       let recordingCanvas = canvas;

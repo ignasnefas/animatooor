@@ -34,9 +34,9 @@ function createGeometry(type: GeometryType, detail: number = 1): THREE.BufferGeo
     case 'ring':
       return new THREE.RingGeometry(0.4, 0.8, radialSegments);
     case 'pyramid':
-      return new THREE.ConeGeometry(0.7, 1.2, 4);
+      return new THREE.ConeGeometry(0.7, 1.2, radialSegments);
     case 'prism':
-      return new THREE.CylinderGeometry(0.8, 0.8, 1, 6);
+      return new THREE.CylinderGeometry(0.8, 0.8, 1, radialSegments);
     case 'capsule':
       // Create capsule using cylinder + spheres
       const capsuleGeometry = new THREE.CapsuleGeometry(0.5, 1.0, radialSegments, segments);
@@ -44,13 +44,13 @@ function createGeometry(type: GeometryType, detail: number = 1): THREE.BufferGeo
     case 'ellipsoid':
       return new THREE.SphereGeometry(0.8, radialSegments, segments, 0, Math.PI * 2, 0, Math.PI * 0.8);
     case 'hexagon':
-      return new THREE.CylinderGeometry(0.8, 0.8, 0.2, 6);
+      return new THREE.CylinderGeometry(0.8, 0.8, 0.2, radialSegments);
     case 'star':
       // Create star shape
       const starShape = new THREE.Shape();
       const outerRadius = 0.8;
       const innerRadius = 0.4;
-      const spikes = 5;
+      const spikes = 5 + detail * 2;
       
       for (let i = 0; i < spikes * 2; i++) {
         const angle = (i * Math.PI) / spikes;
@@ -68,7 +68,7 @@ function createGeometry(type: GeometryType, detail: number = 1): THREE.BufferGeo
       // Create gear shape
       const gearShape = new THREE.Shape();
       const gearRadius = 0.8;
-      const toothCount = 8;
+      const toothCount = 8 + detail * 4;
       const toothHeight = 0.1;
       
       for (let i = 0; i < toothCount * 2; i++) {
@@ -91,8 +91,9 @@ function createGeometry(type: GeometryType, detail: number = 1): THREE.BufferGeo
     case 'spiral':
       // Create spiral using lathe geometry
       const spiralPoints = [];
-      for (let i = 0; i <= 100; i++) {
-        const t = i / 100;
+      const numPoints = 100 + detail * 50;
+      for (let i = 0; i <= numPoints; i++) {
+        const t = i / numPoints;
         const angle = t * Math.PI * 4;
         const radius = 0.1 + t * 0.7;
         const x = Math.cos(angle) * radius;
@@ -112,7 +113,8 @@ function createGeometry(type: GeometryType, detail: number = 1): THREE.BufferGeo
       heartShape.bezierCurveTo(heartX, heartY - 0.2, heartX + 0.25, heartY - 0.2, heartX + 0.25, heartY + 0.05);
       heartShape.bezierCurveTo(heartX + 0.25, heartY + 0.3, heartX, heartY + 0.3, heartX, heartY + 0.3);
       
-      return new THREE.ExtrudeGeometry(heartShape, { depth: 0.2, bevelEnabled: false });
+      const heartDepth = 0.2 + detail * 0.1;
+      return new THREE.ExtrudeGeometry(heartShape, { depth: heartDepth, bevelEnabled: false });
     case 'diamond':
       // Create diamond shape
       const diamondShape = new THREE.Shape();
@@ -122,7 +124,8 @@ function createGeometry(type: GeometryType, detail: number = 1): THREE.BufferGeo
       diamondShape.lineTo(-0.6, 0);
       diamondShape.closePath();
       
-      return new THREE.ExtrudeGeometry(diamondShape, { depth: 0.4, bevelEnabled: false });
+      const diamondDepth = 0.4 + detail * 0.2;
+      return new THREE.ExtrudeGeometry(diamondShape, { depth: diamondDepth, bevelEnabled: false });
     case 'crystal':
       // Create crystal using octahedron with modifications
       const crystalGeometry = new THREE.OctahedronGeometry(0.8, detail);
