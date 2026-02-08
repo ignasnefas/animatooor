@@ -3,36 +3,145 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { AnimationSettings, GeometryType } from '../types';
 
-function createGeometry(type: GeometryType): THREE.BufferGeometry {
+function createGeometry(type: GeometryType, detail: number = 1): THREE.BufferGeometry {
+  // Detail affects subdivision level (0-3)
+  const segments = Math.max(4, 8 + detail * 8); // 8, 16, 24, 32
+  const radialSegments = Math.max(3, 6 + detail * 6); // 6, 12, 18, 24
+  
   switch (type) {
     case 'torus':
-      return new THREE.TorusGeometry(1, 0.4, 32, 64);
+      return new THREE.TorusGeometry(1, 0.4, segments, radialSegments);
     case 'torusKnot':
-      return new THREE.TorusKnotGeometry(0.8, 0.3, 128, 32);
+      return new THREE.TorusKnotGeometry(0.8, 0.3, segments * 4, radialSegments);
     case 'icosahedron':
-      return new THREE.IcosahedronGeometry(0.8, 0);
+      return new THREE.IcosahedronGeometry(0.8, detail);
     case 'octahedron':
-      return new THREE.OctahedronGeometry(0.8, 0);
+      return new THREE.OctahedronGeometry(0.8, detail);
     case 'dodecahedron':
-      return new THREE.DodecahedronGeometry(0.8, 0);
+      return new THREE.DodecahedronGeometry(0.8, detail);
     case 'cube':
-      return new THREE.BoxGeometry(1, 1, 1);
+      return new THREE.BoxGeometry(1, 1, 1, segments, segments, segments);
     case 'sphere':
-      return new THREE.SphereGeometry(0.8, 32, 32);
+      return new THREE.SphereGeometry(0.8, radialSegments, segments);
     case 'cylinder':
-      return new THREE.CylinderGeometry(0.5, 0.5, 1.2, 32);
+      return new THREE.CylinderGeometry(0.5, 0.5, 1.2, radialSegments);
     case 'cone':
-      return new THREE.ConeGeometry(0.7, 1.2, 32);
+      return new THREE.ConeGeometry(0.7, 1.2, radialSegments);
     case 'tetrahedron':
-      return new THREE.TetrahedronGeometry(0.8, 0);
+      return new THREE.TetrahedronGeometry(0.8, detail);
     case 'plane':
-      return new THREE.PlaneGeometry(1.2, 1.2, 8, 8);
+      return new THREE.PlaneGeometry(1.2, 1.2, segments, segments);
     case 'ring':
-      return new THREE.RingGeometry(0.4, 0.8, 32);
+      return new THREE.RingGeometry(0.4, 0.8, radialSegments);
     case 'pyramid':
       return new THREE.ConeGeometry(0.7, 1.2, 4);
     case 'prism':
       return new THREE.CylinderGeometry(0.8, 0.8, 1, 6);
+    case 'capsule':
+      // Create capsule using cylinder + spheres
+      const capsuleGeometry = new THREE.CapsuleGeometry(0.5, 1.0, radialSegments, segments);
+      return capsuleGeometry;
+    case 'ellipsoid':
+      return new THREE.SphereGeometry(0.8, radialSegments, segments, 0, Math.PI * 2, 0, Math.PI * 0.8);
+    case 'hexagon':
+      return new THREE.CylinderGeometry(0.8, 0.8, 0.2, 6);
+    case 'star':
+      // Create star shape
+      const starShape = new THREE.Shape();
+      const outerRadius = 0.8;
+      const innerRadius = 0.4;
+      const spikes = 5;
+      
+      for (let i = 0; i < spikes * 2; i++) {
+        const angle = (i * Math.PI) / spikes;
+        const radius = i % 2 === 0 ? outerRadius : innerRadius;
+        const x = Math.cos(angle) * radius;
+        const y = Math.sin(angle) * radius;
+        
+        if (i === 0) starShape.moveTo(x, y);
+        else starShape.lineTo(x, y);
+      }
+      starShape.closePath();
+      
+      return new THREE.ExtrudeGeometry(starShape, { depth: 0.2, bevelEnabled: false });
+    case 'gear':
+      // Create gear shape
+      const gearShape = new THREE.Shape();
+      const gearRadius = 0.8;
+      const toothCount = 8;
+      const toothHeight = 0.1;
+      
+      for (let i = 0; i < toothCount * 2; i++) {
+        const angle = (i * Math.PI) / toothCount;
+        const radius = i % 2 === 0 ? gearRadius : gearRadius - toothHeight;
+        const x = Math.cos(angle) * radius;
+        const y = Math.sin(angle) * radius;
+        
+        if (i === 0) gearShape.moveTo(x, y);
+        else gearShape.lineTo(x, y);
+      }
+      gearShape.closePath();
+      
+      // Add center hole
+      const holePath = new THREE.Path();
+      holePath.absarc(0, 0, gearRadius * 0.3, 0, Math.PI * 2, false);
+      gearShape.holes.push(holePath);
+      
+      return new THREE.ExtrudeGeometry(gearShape, { depth: 0.3, bevelEnabled: false });
+    case 'spiral':
+      // Create spiral using lathe geometry
+      const spiralPoints = [];
+      for (let i = 0; i <= 100; i++) {
+        const t = i / 100;
+        const angle = t * Math.PI * 4;
+        const radius = 0.1 + t * 0.7;
+        const x = Math.cos(angle) * radius;
+        const y = Math.sin(angle) * radius;
+        spiralPoints.push(new THREE.Vector2(x, y));
+      }
+      return new THREE.LatheGeometry(spiralPoints, radialSegments);
+    case 'heart':
+      // Create heart shape
+      const heartShape = new THREE.Shape();
+      const heartX = 0;
+      const heartY = 0;
+      
+      heartShape.moveTo(heartX, heartY + 0.3);
+      heartShape.bezierCurveTo(heartX, heartY + 0.3, heartX - 0.25, heartY + 0.3, heartX - 0.25, heartY + 0.05);
+      heartShape.bezierCurveTo(heartX - 0.25, heartY - 0.2, heartX, heartY - 0.2, heartX, heartY - 0.2);
+      heartShape.bezierCurveTo(heartX, heartY - 0.2, heartX + 0.25, heartY - 0.2, heartX + 0.25, heartY + 0.05);
+      heartShape.bezierCurveTo(heartX + 0.25, heartY + 0.3, heartX, heartY + 0.3, heartX, heartY + 0.3);
+      
+      return new THREE.ExtrudeGeometry(heartShape, { depth: 0.2, bevelEnabled: false });
+    case 'diamond':
+      // Create diamond shape
+      const diamondShape = new THREE.Shape();
+      diamondShape.moveTo(0, 0.8);
+      diamondShape.lineTo(0.6, 0);
+      diamondShape.lineTo(0, -0.8);
+      diamondShape.lineTo(-0.6, 0);
+      diamondShape.closePath();
+      
+      return new THREE.ExtrudeGeometry(diamondShape, { depth: 0.4, bevelEnabled: false });
+    case 'crystal':
+      // Create crystal using octahedron with modifications
+      const crystalGeometry = new THREE.OctahedronGeometry(0.8, detail);
+      // Add some randomness to vertices for crystal effect
+      const positions = crystalGeometry.attributes.position;
+      for (let i = 0; i < positions.count; i++) {
+        const x = positions.getX(i);
+        const y = positions.getY(i);
+        const z = positions.getZ(i);
+        
+        // Add small random variations
+        const variation = 0.05;
+        positions.setX(i, x + (Math.random() - 0.5) * variation);
+        positions.setY(i, y + (Math.random() - 0.5) * variation);
+        positions.setZ(i, z + (Math.random() - 0.5) * variation);
+      }
+      crystalGeometry.attributes.position.needsUpdate = true;
+      crystalGeometry.computeVertexNormals();
+      return crystalGeometry;
     default:
       return new THREE.TorusKnotGeometry(0.8, 0.3, 128, 32);
   }
@@ -47,7 +156,7 @@ interface ShapeProps {
 function Shape({ settings, index, total }: ShapeProps) {
   const meshRef = useRef<THREE.Mesh>(null);
 
-  const geometry = useMemo(() => createGeometry(settings.geometryType), [settings.geometryType]);
+  const geometry = useMemo(() => createGeometry(settings.geometryType, settings.geometryDetail), [settings.geometryType, settings.geometryDetail]);
 
   const material = useMemo(() => {
     const color1 = new THREE.Color(settings.shapeColor);

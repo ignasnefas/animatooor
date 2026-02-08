@@ -14,6 +14,7 @@ export interface AnimationSettings {
   wireframe: boolean;
   metalness: number;
   roughness: number;
+  geometryDetail: number; // 0-3, controls subdivision/detail level of shapes
 
   // Animation
   animationType: AnimationType;
@@ -88,7 +89,16 @@ export type GeometryType =
   | 'plane'
   | 'ring'
   | 'pyramid'
-  | 'prism';
+  | 'prism'
+  | 'capsule'
+  | 'ellipsoid'
+  | 'hexagon'
+  | 'star'
+  | 'gear'
+  | 'spiral'
+  | 'heart'
+  | 'diamond'
+  | 'crystal';
 
 export type AnimationType =
   | 'orbit'

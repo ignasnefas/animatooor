@@ -1,6 +1,9 @@
 import { useRef, useState, useCallback } from 'react';
 import { AnimationSettings } from '../types';
 import { imageDataToASCIICells, renderASCIIToCanvas } from '../utils/asciiRenderer';
+import { applyBayerDithering, applyFloydSteinbergDithering, reduceColorsTopalette } from '../utils/dithering';
+import { palettes } from '../utils/palettes';
+import { applyPixelation } from '../utils/pixelation';
 
 // Calculate bitrate based on resolution and quality
 function calculateBitrate(width: number, height: number, quality: 'good' | 'excellent' | 'maximum', fps: number = 30): number {
@@ -163,10 +166,17 @@ export function useVideoExport() {
         tempCanvas.width = cropWidth;
         tempCanvas.height = cropHeight;
 
-        let lastFrameTime = Date.now();
+        let capturedFrames = 0;
+        const recordingStartTime = Date.now();
+        
         const compositeCaptureLoop = setInterval(() => {
-          const now = Date.now();
-          if (now - lastFrameTime < frameIntervalMs) return;
+          // Calculate which frame we should be on based on elapsed time
+          const elapsed = Date.now() - recordingStartTime;
+          const currentFrameNumber = Math.floor((elapsed / 1000) * settings.exportFps);
+
+          // Only capture if we haven't already captured this frame
+          if (currentFrameNumber <= capturedFrames) return;
+          capturedFrames = currentFrameNumber;
 
           const ctx = compositeCanvas.getContext('2d');
           const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
@@ -183,6 +193,7 @@ export function useVideoExport() {
               resolution: settings.asciiResolution,
               invert: settings.asciiInvert,
               contrast: settings.asciiContrast,
+              gamma: settings.asciiGamma,
               colorMode: settings.asciiColorMode,
               textColor: settings.asciiTextColor,
               backgroundColor: settings.backgroundColor,
@@ -196,15 +207,15 @@ export function useVideoExport() {
               textColor: settings.asciiTextColor,
               backgroundColor: settings.backgroundColor,
               fontSize: settings.asciiFontSize,
+              fontWeight: settings.asciiFontWeight,
               textOpacity: settings.asciiOpacity,
               backgroundOpacity: settings.asciiBackgroundOpacity,
+              brightnessBoost: settings.asciiBrightnessBoost,
             });
-
-            lastFrameTime = now;
           } catch (e) {
             // Silently handle errors
           }
-        }, frameIntervalMs / 2);
+        }, Math.max(1, frameIntervalMs / 2)); // Check frequently for frames
 
         // Store it for cleanup
         (recordingCanvas as any).__asciiCaptureInterval = compositeCaptureLoop;
@@ -217,22 +228,68 @@ export function useVideoExport() {
         recordingCanvas = compositeCanvas;
         recordingStream = compositeCanvas.captureStream(settings.exportFps);
 
-        let lastFrameTime = Date.now();
+        // Downscaled processing canvas for dithering (huge performance gain)
+        // Process at 50% resolution to match preview and drastically speed up dithering
+        const processScale = 0.5;
+        const processWidth = Math.round(cropWidth * processScale);
+        const processHeight = Math.round(cropHeight * processScale);
+        
+        const processCanvas = document.createElement('canvas');
+        processCanvas.width = processWidth;
+        processCanvas.height = processHeight;
+
+        let capturedFrames = 0;
+        const recordingStartTime = Date.now();
+        
         const compositeCaptureLoop = setInterval(() => {
-          const now = Date.now();
-          if (now - lastFrameTime < frameIntervalMs) return;
+          // Calculate which frame we should be on based on elapsed time
+          const elapsed = Date.now() - recordingStartTime;
+          const currentFrameNumber = Math.floor((elapsed / 1000) * settings.exportFps);
+
+          // Only capture if we haven't already captured this frame
+          if (currentFrameNumber <= capturedFrames) return;
+          capturedFrames = currentFrameNumber;
 
           const ctx = compositeCanvas.getContext('2d');
-          if (!ctx) return;
+          const processCtx = processCanvas.getContext('2d', { willReadFrequently: true });
+          if (!ctx || !processCtx) return;
 
           try {
-            // Draw cropped region to composite canvas
-            ctx.drawImage(canvas, cropX, cropY, cropWidth, cropHeight, 0, 0, settings.exportWidth, settings.exportHeight);
-            lastFrameTime = now;
+            // Draw cropped WebGL directly to processing canvas (auto-scales)
+            processCtx.drawImage(canvas, cropX, cropY, cropWidth, cropHeight, 0, 0, processWidth, processHeight);
+            
+            // Apply dithering/palette effects on downscaled image
+            if (settings.ditheringEnabled || (settings.paletteType !== 'full')) {
+              const imageData = processCtx.getImageData(0, 0, processWidth, processHeight);
+              const palette = palettes[settings.paletteType].colors;
+
+              // Use preview resolution directly for dithering (no further reduction needed)
+              if (settings.ditheringEnabled) {
+                if (settings.ditheringType === 'bayer') {
+                  applyBayerDithering(imageData.data, processWidth, processHeight, palette, settings.ditheringIntensity, settings.ditheringResolution);
+                } else {
+                  applyFloydSteinbergDithering(imageData.data, processWidth, processHeight, palette, settings.ditheringIntensity, settings.ditheringResolution);
+                }
+              } else {
+                // Just reduce colors without dithering
+                reduceColorsTopalette(imageData.data, palette);
+              }
+
+              // Put modified image data back
+              processCtx.putImageData(imageData, 0, 0);
+            }
+
+            // Apply pixelation on top if enabled
+            if (settings.pixelationEnabled && settings.pixelSize > 1) {
+              applyPixelation(processCtx, processCanvas, settings.pixelSize);
+            }
+
+            // Draw upscaled processed image to composite canvas
+            ctx.drawImage(processCanvas, 0, 0, processWidth, processHeight, 0, 0, settings.exportWidth, settings.exportHeight);
           } catch (e) {
             // Silently handle errors
           }
-        }, frameIntervalMs / 2);
+        }, Math.max(1, frameIntervalMs / 2)); // Check frequently for frames
 
         // Store it for cleanup
         (recordingCanvas as any).__compositeCaptureInterval = compositeCaptureLoop;
