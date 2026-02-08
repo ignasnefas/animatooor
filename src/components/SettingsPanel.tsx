@@ -55,6 +55,13 @@ const animationTypes: { value: AnimationType; label: string }[] = [
   { value: 'vortex', label: 'Vortex' },
   { value: 'pendulum', label: 'Pendulum' },
   { value: 'kaleidoscope', label: 'Kaleidoscope' },
+  { value: 'bounce', label: 'Bounce' },
+  { value: 'twist', label: 'Twist' },
+  { value: 'pulse', label: 'Pulse' },
+  { value: 'figure8', label: 'Figure 8' },
+  { value: 'helix', label: 'Helix' },
+  { value: 'ripple', label: 'Ripple' },
+  { value: 'swirl', label: 'Swirl' },
 ];
 
 function Section({ title, icon: Icon, children, defaultOpen = true }: {
@@ -270,7 +277,11 @@ export function SettingsPanel({
           <SliderControl label="Loop Duration" value={settings.loopDuration} min={1} max={10} step={0.5} onChange={(v) => update({ loopDuration: v })} suffix="s" />
           <SliderControl label="Speed" value={settings.speed} min={0.1} max={3} step={0.1} onChange={(v) => update({ speed: v })} suffix="x" />
           <SliderControl label="Amplitude" value={settings.amplitude} min={0.1} max={3} step={0.1} onChange={(v) => update({ amplitude: v })} />
+          <SliderControl label="Vertical Amp" value={settings.verticalAmplitude} min={0.1} max={3} step={0.1} onChange={(v) => update({ verticalAmplitude: v })} />
+          <SliderControl label="Horizontal Amp" value={settings.horizontalAmplitude} min={0.1} max={3} step={0.1} onChange={(v) => update({ horizontalAmplitude: v })} />
           <SliderControl label="Spread" value={settings.spread} min={0.5} max={8} step={0.5} onChange={(v) => update({ spread: v })} />
+          <SliderControl label="Frequency" value={settings.frequency} min={0.5} max={5} step={0.5} onChange={(v) => update({ frequency: v })} suffix="x" />
+          <SliderControl label="Phase Offset" value={settings.phaseOffset} min={0} max={Math.PI * 2} step={0.1} onChange={(v) => update({ phaseOffset: v })} suffix="rad" />
         </Section>
 
         {/* Camera */}
@@ -307,7 +318,20 @@ export function SettingsPanel({
                 ]}
                 onChange={(v) => update({ asciiCharset: v as 'standard' | 'dense' | 'minimal' | 'blocks' | 'braille' })}
               />
-              <SliderControl label="Resolution" value={settings.asciiResolution} min={30} max={160} step={5} onChange={(v) => update({ asciiResolution: v })} suffix=" chars" />
+              <SliderControl label="Resolution" value={settings.asciiResolution} min={20} max={200} step={5} onChange={(v) => update({ asciiResolution: v })} suffix=" chars" />
+              <SliderControl label="Font Size" value={settings.asciiFontSize} min={4} max={100} step={1} onChange={(v) => update({ asciiFontSize: v })} suffix="px" />
+              <SelectControl
+                label="Font Weight"
+                value={settings.asciiFontWeight}
+                options={[
+                  { value: 'normal', label: 'Normal' },
+                  { value: 'bold', label: 'Bold' },
+                ]}
+                onChange={(v) => update({ asciiFontWeight: v as 'normal' | 'bold' })}
+              />
+              <SliderControl label="Text Opacity" value={settings.asciiOpacity} min={0} max={1} step={0.1} onChange={(v) => update({ asciiOpacity: v })} />
+              <SliderControl label="Background Opacity" value={settings.asciiBackgroundOpacity} min={0} max={1} step={0.1} onChange={(v) => update({ asciiBackgroundOpacity: v })} />
+              <SliderControl label="Brightness Boost" value={settings.asciiBrightnessBoost} min={0.1} max={3} step={0.1} onChange={(v) => update({ asciiBrightnessBoost: v })} suffix="x" />
               <ToggleControl label="Color Mode" value={settings.asciiColorMode} onChange={(v) => update({ asciiColorMode: v })} />
               {!settings.asciiColorMode && (
                 <div className="space-y-2">
@@ -321,6 +345,7 @@ export function SettingsPanel({
                 </div>
               )}
               <SliderControl label="Contrast" value={settings.asciiContrast} min={0.5} max={3} step={0.1} onChange={(v) => update({ asciiContrast: v })} />
+              <SliderControl label="Gamma" value={settings.asciiGamma} min={0.5} max={2} step={0.1} onChange={(v) => update({ asciiGamma: v })} />
               <ToggleControl label="Invert" value={settings.asciiInvert} onChange={(v) => update({ asciiInvert: v })} />
             </>
           )}

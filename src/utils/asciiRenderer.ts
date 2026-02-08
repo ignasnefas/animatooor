@@ -161,14 +161,14 @@ function hexToRGB(hex: string): [number, number, number] {
 /**
  * Boost color saturation and brightness for ASCII display
  */
-function boostColor(r: number, g: number, b: number, brightness: number): [number, number, number] {
+function boostColor(r: number, g: number, b: number, brightness: number, brightnessBoost: number = 1.0): [number, number, number] {
   const maxC = Math.max(r, g, b, 1);
   const boost = Math.min(255 / maxC, 3.0);
-  const brightnessBoost = 0.3 + brightness * 1.6;
+  const brightnessMultiplier = 0.3 + brightness * 1.6 * brightnessBoost;
   return [
-    Math.min(255, Math.round(r * boost * brightnessBoost)),
-    Math.min(255, Math.round(g * boost * brightnessBoost)),
-    Math.min(255, Math.round(b * boost * brightnessBoost)),
+    Math.min(255, Math.round(r * boost * brightnessMultiplier)),
+    Math.min(255, Math.round(g * boost * brightnessMultiplier)),
+    Math.min(255, Math.round(b * boost * brightnessMultiplier)),
   ];
 }
 
@@ -183,8 +183,10 @@ export function renderASCIIToCanvas(
   canvasHeight: number,
   options: ASCIIRenderOptions & {
     fontSize?: number;
+    fontWeight?: 'normal' | 'bold';
     textOpacity?: number;
     backgroundOpacity?: number;
+    brightnessBoost?: number;
   }
 ): void {
   const {
@@ -193,6 +195,9 @@ export function renderASCIIToCanvas(
     backgroundColor = '#000000',
     textOpacity = 1,
     backgroundOpacity = 1,
+    fontSize,
+    fontWeight = 'bold',
+    brightnessBoost = 1.0,
   } = options;
 
   const [bgR, bgG, bgB] = hexToRGB(backgroundColor);
@@ -207,11 +212,17 @@ export function renderASCIIToCanvas(
   const cellW = canvasWidth / frame.cols;
   const cellH = canvasHeight / frame.rows;
 
-  // Pick font size that fits cells snugly
-  const fitFontSize = Math.min(cellH * 1.1, cellW * 1.8);
-  const actualFontSize = Math.max(4, fitFontSize);
+  // Use provided fontSize or auto-calculate
+  let actualFontSize: number;
+  if (fontSize && fontSize > 0) {
+    actualFontSize = fontSize;
+  } else {
+    // Pick font size that fits cells snugly
+    const fitFontSize = Math.min(cellH * 1.1, cellW * 1.8);
+    actualFontSize = Math.max(4, fitFontSize);
+  }
 
-  ctx.font = `bold ${actualFontSize}px "Courier New", "Consolas", monospace`;
+  ctx.font = `${fontWeight} ${actualFontSize}px "Courier New", "Consolas", monospace`;
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'center';
 
@@ -226,7 +237,7 @@ export function renderASCIIToCanvas(
       const x = col * cellW + cellW / 2;
 
       if (colorMode) {
-        const [cr, cg, cb] = boostColor(cell.r, cell.g, cell.b, cell.brightness);
+        const [cr, cg, cb] = boostColor(cell.r, cell.g, cell.b, cell.brightness, brightnessBoost);
         ctx.fillStyle = `rgba(${cr}, ${cg}, ${cb}, ${textOpacity})`;
       } else {
         const b = Math.min(1, cell.brightness + 0.15);

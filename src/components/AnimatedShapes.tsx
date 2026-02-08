@@ -84,37 +84,36 @@ function Shape({ settings, index, total }: ShapeProps) {
     
     // Ensure loopT stays in valid range [0, 1) to prevent floating point precision issues
     // that can cause jumps at loop boundaries, especially in exported videos
-    if (loopT >= 0.9999999) {
-      loopT = 0;
-    } else if (loopT < 0) {
-      loopT = 0;
-    }
+    if (loopT < 0) loopT += 1;
     
     // Base phase always goes from 0 to 2π for a complete cycle per loopDuration
     const basePhase = loopT * Math.PI * 2;
     // Speed affects how fast the animation moves within the cycle
-    const phase = basePhase * settings.speed;
+    const phase = basePhase * settings.speed + settings.phaseOffset;
     const offset = total > 1 ? (index / total) * Math.PI * 2 : 0;
     const amp = settings.amplitude;
+    const vAmp = settings.verticalAmplitude;
+    const hAmp = settings.horizontalAmplitude;
     const spread = settings.spread;
+    const freq = settings.frequency;
 
     switch (settings.animationType) {
       case 'orbit': {
         const angle = phase + offset;
         const radius = spread * 0.5;
-        meshRef.current.position.x = Math.cos(angle) * radius;
-        meshRef.current.position.y = Math.sin(angle * 2) * amp * 0.3;
+        meshRef.current.position.x = Math.cos(angle) * radius * hAmp;
+        meshRef.current.position.y = Math.sin(angle * 2) * amp * 0.3 * vAmp;
         meshRef.current.position.z = Math.sin(angle) * radius;
         meshRef.current.rotation.x = phase * 2 + offset;
         meshRef.current.rotation.y = phase * 2 + offset;
         break;
       }
       case 'breathe': {
-        const breathScale = 1 + Math.sin(phase + offset) * 0.3 * amp;
+        const breathScale = 1 + Math.sin(phase * freq + offset) * 0.3 * amp;
         const baseAngle = offset;
         const radius = spread * 0.4;
-        meshRef.current.position.x = Math.cos(baseAngle) * radius;
-        meshRef.current.position.y = Math.sin(baseAngle) * radius * 0.5;
+        meshRef.current.position.x = Math.cos(baseAngle) * radius * hAmp;
+        meshRef.current.position.y = Math.sin(baseAngle) * radius * 0.5 * vAmp;
         meshRef.current.position.z = Math.sin(baseAngle * 0.7) * radius * 0.5;
         meshRef.current.scale.setScalar(breathScale * settings.shapeScale);
         meshRef.current.rotation.x = phase * 0.5 + offset;
@@ -133,9 +132,9 @@ function Shape({ settings, index, total }: ShapeProps) {
         break;
       }
       case 'wave': {
-        const waveX = (index - total / 2) * spread * 0.3;
-        const waveY = Math.sin(phase + offset) * amp;
-        const waveZ = Math.cos(phase + offset * 0.5) * amp * 0.5;
+        const waveX = (index - total / 2) * spread * 0.3 * hAmp;
+        const waveY = Math.sin(phase * freq + offset) * amp * vAmp;
+        const waveZ = Math.cos(phase * freq + offset * 0.5) * amp * 0.5;
         meshRef.current.position.x = waveX;
         meshRef.current.position.y = waveY;
         meshRef.current.position.z = waveZ;
@@ -196,10 +195,10 @@ function Shape({ settings, index, total }: ShapeProps) {
         break;
       }
       case 'pendulum': {
-        const pendulumAngle = Math.sin(phase + offset) * amp * 0.8;
-        const pendulumX = (index - total / 2) * spread * 0.25;
+        const pendulumAngle = Math.sin(phase * freq + offset) * amp * 0.8;
+        const pendulumX = (index - total / 2) * spread * 0.25 * hAmp;
         meshRef.current.position.x = pendulumX;
-        meshRef.current.position.y = Math.cos(pendulumAngle) * 2 - 1;
+        meshRef.current.position.y = Math.cos(pendulumAngle) * 2 * vAmp - 1;
         meshRef.current.position.z = Math.sin(pendulumAngle) * 1;
         meshRef.current.rotation.z = pendulumAngle;
         meshRef.current.rotation.x = phase * 0.3;
@@ -209,14 +208,96 @@ function Shape({ settings, index, total }: ShapeProps) {
         const kAngle = offset + phase;
         const kR = spread * 0.4;
         const kMirror = index % 2 === 0 ? 1 : -1;
-        meshRef.current.position.x = Math.cos(kAngle) * kR * kMirror;
-        meshRef.current.position.y = Math.sin(kAngle) * kR;
+        meshRef.current.position.x = Math.cos(kAngle) * kR * kMirror * hAmp;
+        meshRef.current.position.y = Math.sin(kAngle) * kR * vAmp;
         meshRef.current.position.z = Math.sin(phase + offset * 2) * amp * 0.5;
         meshRef.current.rotation.x = phase * kMirror;
         meshRef.current.rotation.y = phase * 2;
         meshRef.current.rotation.z = kAngle;
         const kScale = 0.8 + Math.sin(phase * 2 + offset) * 0.3;
         meshRef.current.scale.setScalar(kScale * settings.shapeScale);
+        break;
+      }
+      case 'bounce': {
+        const bounceY = Math.abs(Math.sin(phase * freq + offset)) * amp * vAmp;
+        const bounceX = Math.cos(offset) * spread * 0.3 * hAmp;
+        const bounceZ = Math.sin(offset) * spread * 0.3;
+        meshRef.current.position.x = bounceX;
+        meshRef.current.position.y = bounceY;
+        meshRef.current.position.z = bounceZ;
+        meshRef.current.rotation.x = phase * 2 + offset;
+        meshRef.current.rotation.z = phase + offset;
+        const bounceScale = 1 + Math.sin(phase * freq + offset) * 0.2;
+        meshRef.current.scale.setScalar(bounceScale * settings.shapeScale);
+        break;
+      }
+      case 'twist': {
+        const twistAngle = phase * freq + offset;
+        const twistR = spread * 0.4;
+        meshRef.current.position.x = Math.cos(twistAngle) * twistR * hAmp;
+        meshRef.current.position.y = Math.sin(twistAngle * 2) * amp * 0.5 * vAmp;
+        meshRef.current.position.z = Math.sin(twistAngle) * twistR;
+        meshRef.current.rotation.x = twistAngle;
+        meshRef.current.rotation.y = twistAngle * 1.5;
+        meshRef.current.rotation.z = twistAngle * 0.5;
+        break;
+      }
+      case 'pulse': {
+        const pulseScale = 1 + Math.sin(phase * freq + offset) * 0.5 * amp;
+        const pulseX = Math.cos(offset) * spread * 0.2 * hAmp;
+        const pulseZ = Math.sin(offset) * spread * 0.2;
+        meshRef.current.position.x = pulseX;
+        meshRef.current.position.y = Math.sin(phase * freq * 2 + offset) * amp * 0.3 * vAmp;
+        meshRef.current.position.z = pulseZ;
+        meshRef.current.scale.setScalar(pulseScale * settings.shapeScale);
+        meshRef.current.rotation.x = phase + offset;
+        meshRef.current.rotation.y = phase * 0.5;
+        break;
+      }
+      case 'figure8': {
+        const fig8Angle = phase * freq + offset;
+        const fig8R = spread * 0.4;
+        meshRef.current.position.x = Math.sin(fig8Angle) * fig8R * hAmp;
+        meshRef.current.position.y = Math.sin(fig8Angle * 2) * amp * 0.5 * vAmp;
+        meshRef.current.position.z = Math.cos(fig8Angle) * fig8R;
+        meshRef.current.rotation.x = phase * 2;
+        meshRef.current.rotation.z = fig8Angle;
+        break;
+      }
+      case 'helix': {
+        const helixAngle = phase * freq + offset;
+        const helixR = spread * 0.3;
+        const helixY = (phase / (Math.PI * 2)) * spread * 2 - spread;
+        meshRef.current.position.x = Math.cos(helixAngle) * helixR * hAmp;
+        meshRef.current.position.y = helixY * vAmp;
+        meshRef.current.position.z = Math.sin(helixAngle) * helixR;
+        meshRef.current.rotation.x = phase * 3;
+        meshRef.current.rotation.y = helixAngle;
+        break;
+      }
+      case 'ripple': {
+        const rippleDist = (index / total) * spread;
+        const ripplePhase = phase * freq - rippleDist * 0.5;
+        const rippleY = Math.sin(ripplePhase) * amp * vAmp;
+        const rippleX = (index - total / 2) * spread * 0.1 * hAmp;
+        meshRef.current.position.x = rippleX;
+        meshRef.current.position.y = rippleY;
+        meshRef.current.position.z = Math.cos(ripplePhase) * amp * 0.5;
+        meshRef.current.rotation.x = ripplePhase;
+        meshRef.current.rotation.z = ripplePhase * 0.5;
+        const rippleScale = 0.8 + Math.sin(ripplePhase) * 0.4;
+        meshRef.current.scale.setScalar(rippleScale * settings.shapeScale);
+        break;
+      }
+      case 'swirl': {
+        const swirlAngle = phase * freq + offset;
+        const swirlR = spread * 0.3 * (1 + 0.3 * Math.sin(phase + offset));
+        meshRef.current.position.x = Math.cos(swirlAngle) * swirlR * hAmp;
+        meshRef.current.position.y = Math.sin(swirlAngle * 2) * amp * 0.4 * vAmp;
+        meshRef.current.position.z = Math.sin(swirlAngle) * swirlR;
+        meshRef.current.rotation.x = swirlAngle * 2;
+        meshRef.current.rotation.y = swirlAngle;
+        meshRef.current.rotation.z = phase;
         break;
       }
     }

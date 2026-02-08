@@ -130,6 +130,7 @@ function ASCIIEffect({ glCanvas, settings }: { glCanvas: HTMLCanvasElement | nul
         resolution: settings.asciiResolution,
         invert: settings.asciiInvert,
         contrast: settings.asciiContrast,
+        gamma: settings.asciiGamma,
         colorMode: settings.asciiColorMode,
         textColor: settings.asciiTextColor,
         backgroundColor: settings.backgroundColor,
@@ -143,8 +144,10 @@ function ASCIIEffect({ glCanvas, settings }: { glCanvas: HTMLCanvasElement | nul
         textColor: settings.asciiTextColor,
         backgroundColor: settings.backgroundColor,
         fontSize: settings.asciiFontSize,
+        fontWeight: settings.asciiFontWeight,
         textOpacity: settings.asciiOpacity,
         backgroundOpacity: settings.asciiBackgroundOpacity,
+        brightnessBoost: settings.asciiBrightnessBoost,
       });
     } catch (_) {
       // silently fail if canvas not ready
@@ -173,7 +176,7 @@ function ASCIIEffect({ glCanvas, settings }: { glCanvas: HTMLCanvasElement | nul
   );
 }
 
-function ResolutionBorders({ settings, containerRef }: { settings: AnimationSettings; containerRef: React.RefObject<HTMLDivElement> }) {
+function ResolutionBorders({ settings, containerRef }: { settings: AnimationSettings; containerRef: React.RefObject<HTMLDivElement | null> }) {
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
   useEffect(() => {

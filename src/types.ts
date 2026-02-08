@@ -21,6 +21,10 @@ export interface AnimationSettings {
   speed: number;
   amplitude: number;
   spread: number;
+  frequency: number; // for more complex oscillations
+  phaseOffset: number; // phase offset for animations
+  verticalAmplitude: number; // separate control for vertical movement
+  horizontalAmplitude: number; // separate control for horizontal movement
 
   // Camera
   cameraDistance: number;
@@ -40,10 +44,13 @@ export interface AnimationSettings {
   asciiOpacity: number; // 0-1, opacity of ASCII text
   asciiBackgroundOpacity: number; // 0-1, opacity of background
   asciiTextColor: string; // hex color for monochrome mode
-  asciiFontSize: number; // pixels (unused now — auto-sized)
+  asciiFontSize: number; // pixels (now actually used!)
+  asciiFontWeight: 'normal' | 'bold'; // font weight
   asciiInvert: boolean; // invert brightness
   asciiContrast: number; // 0-3, adjust contrast
+  asciiGamma: number; // 0.5-2.0, gamma correction
   asciiColorMode: boolean; // true = colored ASCII from scene, false = monochrome
+  asciiBrightnessBoost: number; // 0-2, additional brightness boost
 
   // Export
   exportWidth: number;
@@ -80,7 +87,14 @@ export type AnimationType =
   | 'cascade'
   | 'vortex'
   | 'pendulum'
-  | 'kaleidoscope';
+  | 'kaleidoscope'
+  | 'bounce'
+  | 'twist'
+  | 'pulse'
+  | 'figure8'
+  | 'helix'
+  | 'ripple'
+  | 'swirl';
 
 export interface Preset {
   id: string;
