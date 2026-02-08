@@ -12,6 +12,7 @@ export function App() {
   const [settings, setSettings] = useState<AnimationSettings>(defaultSettings);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
+  const [showBorders, setShowBorders] = useState(false);
   const sceneRef = useRef<SceneHandle>(null);
   const { isExporting, exportProgress, exportVideo } = useVideoExport();
 
@@ -36,7 +37,7 @@ export function App() {
       <div className="flex-1 relative">
         {/* 3D Scene */}
         <div className={`w-full h-full transition-opacity duration-300 ${isPaused ? 'opacity-50' : ''}`}>
-          <Scene ref={sceneRef} settings={settings} />
+        <Scene ref={sceneRef} settings={settings} showBorders={showBorders} />
         </div>
 
         {/* Top bar overlay */}
@@ -113,6 +114,8 @@ export function App() {
           exportProgress={exportProgress}
           onApplyPreset={handleApplyPreset}
           onReset={handleReset}
+          showBorders={showBorders}
+          onToggleBorders={() => setShowBorders(!showBorders)}
         />
       </div>
 

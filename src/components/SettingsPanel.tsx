@@ -23,6 +23,8 @@ interface SettingsPanelProps {
   exportProgress: number;
   onApplyPreset: (preset: Preset) => void;
   onReset: () => void;
+  showBorders: boolean;
+  onToggleBorders: () => void;
 }
 
 const geometryTypes: { value: GeometryType; label: string }[] = [
@@ -185,6 +187,8 @@ export function SettingsPanel({
   exportProgress,
   onApplyPreset,
   onReset,
+  showBorders,
+  onToggleBorders,
 }: SettingsPanelProps) {
   const update = (partial: Partial<AnimationSettings>) => {
     onSettingsChange({ ...settings, ...partial });
@@ -350,6 +354,7 @@ export function SettingsPanel({
             ]}
             onChange={(v) => update({ exportFormat: v as 'webm' | 'gif' })}
           />
+          <ToggleControl label="Show Resolution Borders" value={showBorders} onChange={onToggleBorders} />
         </Section>
       </div>
 

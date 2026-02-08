@@ -1,4 +1,4 @@
-import { useRef, forwardRef, useImperativeHandle, useEffect, useCallback } from 'react';
+import { useRef, forwardRef, useImperativeHandle, useEffect, useCallback, useState } from 'react';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { OrbitControls, Environment } from '@react-three/drei';
 import * as THREE from 'three';
@@ -79,6 +79,7 @@ export interface SceneHandle {
 
 interface SceneProps {
   settings: AnimationSettings;
+  showBorders: boolean;
 }
 
 /**
@@ -172,7 +173,64 @@ function ASCIIEffect({ glCanvas, settings }: { glCanvas: HTMLCanvasElement | nul
   );
 }
 
-export const Scene = forwardRef<SceneHandle, SceneProps>(function Scene({ settings }, ref) {
+function ResolutionBorders({ settings, containerRef }: { settings: AnimationSettings; containerRef: React.RefObject<HTMLDivElement> }) {
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const updateDimensions = () => {
+      if (containerRef.current) {
+        setDimensions({
+          width: containerRef.current.offsetWidth,
+          height: containerRef.current.offsetHeight,
+        });
+      }
+    };
+
+    updateDimensions();
+    window.addEventListener('resize', updateDimensions);
+    return () => window.removeEventListener('resize', updateDimensions);
+  }, [containerRef]);
+
+  if (dimensions.width === 0 || dimensions.height === 0) return null;
+
+  const aspectRatio = settings.exportWidth / settings.exportHeight;
+  const screenWidth = dimensions.width;
+  const screenHeight = dimensions.height;
+  const screenAspectRatio = screenWidth / screenHeight;
+
+  let borderWidth, borderHeight, borderLeft, borderTop;
+
+  if (aspectRatio > screenAspectRatio) {
+    // Export is wider than screen, fit width
+    borderWidth = screenWidth;
+    borderHeight = screenWidth / aspectRatio;
+    borderLeft = 0;
+    borderTop = (screenHeight - borderHeight) / 2;
+  } else {
+    // Export is taller than screen, fit height
+    borderHeight = screenHeight;
+    borderWidth = screenHeight * aspectRatio;
+    borderTop = 0;
+    borderLeft = (screenWidth - borderWidth) / 2;
+  }
+
+  return (
+    <div
+      className="absolute inset-0 pointer-events-none z-20"
+      style={{
+        border: '2px solid rgba(255, 255, 255, 0.8)',
+        borderRadius: '4px',
+        boxShadow: '0 0 0 1px rgba(0, 0, 0, 0.5)',
+        left: `${borderLeft}px`,
+        top: `${borderTop}px`,
+        width: `${borderWidth}px`,
+        height: `${borderHeight}px`,
+      }}
+    />
+  );
+}
+
+export const Scene = forwardRef<SceneHandle, SceneProps>(function Scene({ settings, showBorders }, ref) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -209,6 +267,7 @@ export const Scene = forwardRef<SceneHandle, SceneProps>(function Scene({ settin
         )}
       </Canvas>
       <ASCIIEffect glCanvas={canvasRef.current} settings={settings} />
+      {showBorders && <ResolutionBorders settings={settings} containerRef={containerRef} />}
     </div>
   );
 });

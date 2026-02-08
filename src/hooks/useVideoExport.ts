@@ -31,22 +31,44 @@ export function useVideoExport() {
       // which could cause a discontinuity when the video loops
       const stopDurationMs = exactDurationMs - (frameIntervalMs * 0.1);
 
+      // Calculate crop dimensions to match export aspect ratio
+      const exportAspectRatio = settings.exportWidth / settings.exportHeight;
+      const screenWidth = canvas.width;
+      const screenHeight = canvas.height;
+      const screenAspectRatio = screenWidth / screenHeight;
+
+      let cropWidth, cropHeight, cropX, cropY;
+
+      if (exportAspectRatio > screenAspectRatio) {
+        // Export is wider, crop height
+        cropWidth = screenWidth;
+        cropHeight = screenWidth / exportAspectRatio;
+        cropX = 0;
+        cropY = (screenHeight - cropHeight) / 2;
+      } else {
+        // Export is taller, crop width
+        cropHeight = screenHeight;
+        cropWidth = screenHeight * exportAspectRatio;
+        cropX = (screenWidth - cropWidth) / 2;
+        cropY = 0;
+      }
+
       let recordingCanvas = canvas;
       let recordingStream: MediaStream;
 
       // If ASCII is enabled, capture and process frames manually
       if (settings.asciiEnabled) {
         const compositeCanvas = document.createElement('canvas');
-        compositeCanvas.width = canvas.width;
-        compositeCanvas.height = canvas.height;
+        compositeCanvas.width = settings.exportWidth;
+        compositeCanvas.height = settings.exportHeight;
         
         recordingCanvas = compositeCanvas;
         recordingStream = compositeCanvas.captureStream(settings.exportFps);
 
         // Temp canvas to read WebGL pixels
         const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = canvas.width;
-        tempCanvas.height = canvas.height;
+        tempCanvas.width = cropWidth;
+        tempCanvas.height = cropHeight;
 
         let lastFrameTime = Date.now();
         const compositeCaptureLoop = setInterval(() => {
@@ -58,12 +80,12 @@ export function useVideoExport() {
           if (!ctx || !tempCtx) return;
 
           try {
-            // Copy WebGL pixels to temp canvas
-            tempCtx.drawImage(canvas, 0, 0);
-            const imageData = tempCtx.getImageData(0, 0, canvas.width, canvas.height);
+            // Copy cropped WebGL pixels to temp canvas
+            tempCtx.drawImage(canvas, cropX, cropY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+            const imageData = tempCtx.getImageData(0, 0, cropWidth, cropHeight);
 
             // Convert to ASCII cell grid
-            const frame = imageDataToASCIICells(imageData, canvas.width, canvas.height, {
+            const frame = imageDataToASCIICells(imageData, cropWidth, cropHeight, {
               charset: settings.asciiCharset,
               resolution: settings.asciiResolution,
               invert: settings.asciiInvert,
@@ -94,7 +116,33 @@ export function useVideoExport() {
         // Store it for cleanup
         (recordingCanvas as any).__asciiCaptureInterval = compositeCaptureLoop;
       } else {
-        recordingStream = canvas.captureStream(settings.exportFps);
+        // For non-ASCII, create composite canvas with export dimensions and crop
+        const compositeCanvas = document.createElement('canvas');
+        compositeCanvas.width = settings.exportWidth;
+        compositeCanvas.height = settings.exportHeight;
+        
+        recordingCanvas = compositeCanvas;
+        recordingStream = compositeCanvas.captureStream(settings.exportFps);
+
+        let lastFrameTime = Date.now();
+        const compositeCaptureLoop = setInterval(() => {
+          const now = Date.now();
+          if (now - lastFrameTime < frameIntervalMs) return;
+
+          const ctx = compositeCanvas.getContext('2d');
+          if (!ctx) return;
+
+          try {
+            // Draw cropped region to composite canvas
+            ctx.drawImage(canvas, cropX, cropY, cropWidth, cropHeight, 0, 0, settings.exportWidth, settings.exportHeight);
+            lastFrameTime = now;
+          } catch (e) {
+            // Silently handle errors
+          }
+        }, frameIntervalMs / 2);
+
+        // Store it for cleanup
+        (recordingCanvas as any).__compositeCaptureInterval = compositeCaptureLoop;
       }
 
       const mimeType = 'video/webm;codecs=vp9';
@@ -137,9 +185,12 @@ export function useVideoExport() {
         mediaRecorder.onstop = () => {
           clearInterval(progressInterval);
 
-          // Clean up ASCII capture interval if it exists
+          // Clean up capture intervals if they exist
           if ((recordingCanvas as any).__asciiCaptureInterval) {
             clearInterval((recordingCanvas as any).__asciiCaptureInterval);
+          }
+          if ((recordingCanvas as any).__compositeCaptureInterval) {
+            clearInterval((recordingCanvas as any).__compositeCaptureInterval);
           }
 
           if (!abortRef.current && chunks.length > 0) {
