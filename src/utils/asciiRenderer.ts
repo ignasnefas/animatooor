@@ -68,6 +68,7 @@ export function imageDataToASCIICells(
     invert = false,
     contrast = 1.2,
     gamma = 1.0,
+    backgroundColor = '#000000',
   } = options;
 
   const chars = charsets[charset] || charsets.standard;
@@ -83,6 +84,9 @@ export function imageDataToASCIICells(
 
   // Pre-compute gamma/contrast values if needed
   const logGamma = gamma !== 1.0 ? 1.0 / gamma : 1.0;
+
+  // Get background color to detect and skip background pixels
+  const [bgR, bgG, bgB] = hexToRGB(backgroundColor);
 
   const cellW = Math.floor(cellWidth);
   const cellH = Math.floor(cellHeight);
@@ -124,6 +128,15 @@ export function imageDataToASCIICells(
       const avgG = totalG * sampleCountRecip;
       const avgB = totalB * sampleCountRecip;
 
+      // Check if pixel is background color (with tolerance for anti-aliasing)
+      // If so, render as space to avoid ASCII artifacts on empty background
+      const colorDiff = Math.abs(avgR - bgR) + Math.abs(avgG - bgG) + Math.abs(avgB - bgB);
+      if (colorDiff < 15) {
+        // Pixel is background color, render as space
+        rowCells.push({ char: ' ', r: avgR | 0, g: avgG | 0, b: avgB | 0, brightness: 0 });
+        continue;
+      }
+
       let brightness = getLuminance(avgR, avgG, avgB);
 
       // Gamma correction
@@ -141,6 +154,7 @@ export function imageDataToASCIICells(
         brightness = 1 - brightness;
       }
 
+      // Map brightness to character
       const charIndex = brightness * (charsLen - 1) | 0;
       const char = chars[charIndex];
 
