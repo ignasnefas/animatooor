@@ -406,8 +406,11 @@ export function SettingsPanel({
                 options={[
                   { value: 'bayer', label: 'Bayer (Ordered)' },
                   { value: 'floydSteinberg', label: 'Floyd-Steinberg (Diffusion)' },
+                  { value: 'jjn', label: 'Jarvis-Judson-Ninke (High Quality)' },
+                  { value: 'stucki', label: 'Stucki (Smooth)' },
+                  { value: 'sierra', label: 'Sierra (Balanced)' },
                 ]}
-                onChange={(v) => update({ ditheringType: v as 'bayer' | 'floydSteinberg' })}
+                onChange={(v) => update({ ditheringType: v as 'bayer' | 'floydSteinberg' | 'jjn' | 'stucki' | 'sierra' })}
               />
               <SliderControl
                 label="Dither Intensity"

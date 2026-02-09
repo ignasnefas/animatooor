@@ -52,7 +52,7 @@ export interface AnimationSettings {
 
   // Dithering & Palette Effects
   ditheringEnabled: boolean;
-  ditheringType: 'bayer' | 'floydSteinberg';
+  ditheringType: 'bayer' | 'floydSteinberg' | 'jjn' | 'stucki' | 'sierra';
   ditheringIntensity: number; // 0-1
   ditheringResolution: number; // 0.05-1.0, lower = faster, in proportion to canvas
   paletteType: 'full' | 'nes' | 'gameboy' | 'commodore64' | 'atari2600' | 'zxspectrum' | 'amstradcpc' | 'apple2' | 'grayscale';

@@ -2,7 +2,7 @@
  * Dithering algorithms for retro visual effects
  */
 
-export type DitheringType = 'none' | 'bayer' | 'floydSteinberg' | 'ordered';
+export type DitheringType = 'none' | 'bayer' | 'floydSteinberg' | 'jjn' | 'stucki' | 'sierra' | 'ordered';
 
 /**
  * Bayer matrix for ordered dithering
@@ -63,7 +63,7 @@ export function applyBayerDithering(
 
 /**
  * Apply Floyd-Steinberg dithering (diffusion-based)
- * Optimized with reduced allocations
+ * Optimized with reduced allocations and fixed error distribution
  */
 export function applyFloydSteinbergDithering(
   data: Uint8ClampedArray,
@@ -79,62 +79,77 @@ export function applyFloydSteinbergDithering(
     return;
   }
 
-  // Use two rows of error buffers (more memory efficient than full copy)
-  const errBuffer = new Float32Array((width + 2) * 2 * 3);
+  // Create error buffers for current and next row (RGB channels)
+  const errorBuffer = new Float32Array((width + 2) * 3 * 2);
   let currentRow = 0;
 
   for (let y = 0; y < height; y++) {
     const nextRow = 1 - currentRow;
-    const currentBuf = errBuffer.subarray(currentRow * (width + 2) * 3, (currentRow + 1) * (width + 2) * 3);
-    const nextBuf = errBuffer.subarray(nextRow * (width + 2) * 3, nextRow + 1 * (width + 2) * 3);
     
-    // Clear next row
-    nextBuf.fill(0);
+    // Clear next row buffer at start
+    const nextBufStart = nextRow * (width + 2) * 3;
+    for (let i = 0; i < (width + 2) * 3; i++) {
+      errorBuffer[nextBufStart + i] = 0;
+    }
+
+    const currentBufStart = currentRow * (width + 2) * 3;
 
     for (let x = 0; x < width; x++) {
       const idx = (y * width + x) * 4;
-      const errIdx = (x + 1) * 3;
+      const errIdx = currentBufStart + (x + 1) * 3; // +1 for border pixel
 
       // Apply accumulated error
-      let r = Math.max(0, Math.min(255, data[idx] + currentBuf[errIdx] * intensity));
-      let g = Math.max(0, Math.min(255, data[idx + 1] + currentBuf[errIdx + 1] * intensity));
-      let b = Math.max(0, Math.min(255, data[idx + 2] + currentBuf[errIdx + 2] * intensity));
+      let r = Math.max(0, Math.min(255, data[idx] + errorBuffer[errIdx] * intensity));
+      let g = Math.max(0, Math.min(255, data[idx + 1] + errorBuffer[errIdx + 1] * intensity));
+      let b = Math.max(0, Math.min(255, data[idx + 2] + errorBuffer[errIdx + 2] * intensity));
 
       // Find nearest palette color
       const [pr, pg, pb] = findNearestColor(r | 0, g | 0, b | 0, palette);
 
-      // Calculate error
+      // Calculate error (quantization error)
       const errR = (r - pr) / 16;
       const errG = (g - pg) / 16;
       const errB = (b - pb) / 16;
 
-      // Set pixel
+      // Set pixel to palette color
       data[idx] = pr;
       data[idx + 1] = pg;
       data[idx + 2] = pb;
 
-      // Distribute error (Floyd-Steinberg weights: 7/16, 3/16, 5/16, 1/16)
+      // Distribute error using Floyd-Steinberg kernel:
+      //       X   7/16
+      // 3/16  5/16  1/16
+      const nextBufStart_row = nextRow * (width + 2) * 3;
+      
+      // Right (7/16) - current row
       if (x < width - 1) {
-        currentBuf[errIdx + 3] += errR * 7;
-        currentBuf[errIdx + 4] += errG * 7;
-        currentBuf[errIdx + 5] += errB * 7;
+        errorBuffer[errIdx + 3] += errR * 7;
+        errorBuffer[errIdx + 4] += errG * 7;
+        errorBuffer[errIdx + 5] += errB * 7;
       }
       
+      // Below-left (3/16) - next row
       if (y < height - 1) {
-        if (x > 0) {
-          nextBuf[errIdx] += errR * 3;
-          nextBuf[errIdx + 1] += errG * 3;
-          nextBuf[errIdx + 2] += errB * 3;
-        }
-        nextBuf[errIdx + 3] += errR * 5;
-        nextBuf[errIdx + 4] += errG * 5;
-        nextBuf[errIdx + 5] += errB * 5;
-        
-        if (x < width - 1) {
-          nextBuf[errIdx + 6] += errR;
-          nextBuf[errIdx + 7] += errG;
-          nextBuf[errIdx + 8] += errB;
-        }
+        const belowLeftIdx = nextBufStart_row + x * 3;
+        errorBuffer[belowLeftIdx] += errR * 3;
+        errorBuffer[belowLeftIdx + 1] += errG * 3;
+        errorBuffer[belowLeftIdx + 2] += errB * 3;
+      }
+      
+      // Below (5/16) - next row
+      if (y < height - 1) {
+        const belowIdx = nextBufStart_row + (x + 1) * 3;
+        errorBuffer[belowIdx] += errR * 5;
+        errorBuffer[belowIdx + 1] += errG * 5;
+        errorBuffer[belowIdx + 2] += errB * 5;
+      }
+      
+      // Below-right (1/16) - next row
+      if (y < height - 1 && x < width - 1) {
+        const belowRightIdx = nextBufStart_row + (x + 2) * 3;
+        errorBuffer[belowRightIdx] += errR;
+        errorBuffer[belowRightIdx + 1] += errG;
+        errorBuffer[belowRightIdx + 2] += errB;
       }
     }
     
@@ -143,9 +158,318 @@ export function applyFloydSteinbergDithering(
 }
 
 /**
- * Apply dithering at a lower resolution for better performance
- * Downscales, dithers, and upscales back using nearest-neighbor
+ * Apply Jarvis-Judson-Ninke dithering (7x7 kernel, higher quality)
+ * More diffusion than Floyd-Steinberg, produces smoother results
  */
+export function applyJJNDithering(
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  palette: [number, number, number][],
+  intensity: number = 1.0,
+  resolution: number = 1.0
+): void {
+  if (resolution < 1) {
+    applyDitheringAtLowerResolution(data, width, height, palette, intensity, resolution, 'jjn');
+    return;
+  }
+
+  // Allocate error buffer for 3 rows (current + 2 next rows for 7x7 kernel)
+  const errorBuffer = new Float32Array((width + 6) * 3 * 3);
+  let currentRow = 0;
+
+  for (let y = 0; y < height; y++) {
+    const nextRow = (currentRow + 1) % 3;
+    const nextNextRow = (currentRow + 2) % 3;
+
+    // Clear future rows
+    for (let i = nextRow * (width + 6) * 3; i < (nextRow + 1) * (width + 6) * 3; i++) {
+      errorBuffer[i] = 0;
+    }
+    for (let i = nextNextRow * (width + 6) * 3; i < (nextNextRow + 1) * (width + 6) * 3; i++) {
+      errorBuffer[i] = 0;
+    }
+
+    const currentBufStart = currentRow * (width + 6) * 3;
+    const nextBufStart = nextRow * (width + 6) * 3;
+    const nextNextBufStart = nextNextRow * (width + 6) * 3;
+
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+      const errIdx = currentBufStart + (x + 3) * 3; // +3 for 3-pixel border
+
+      // Apply accumulated error
+      let r = Math.max(0, Math.min(255, data[idx] + errorBuffer[errIdx] * intensity));
+      let g = Math.max(0, Math.min(255, data[idx + 1] + errorBuffer[errIdx + 1] * intensity));
+      let b = Math.max(0, Math.min(255, data[idx + 2] + errorBuffer[errIdx + 2] * intensity));
+
+      const [pr, pg, pb] = findNearestColor(r | 0, g | 0, b | 0, palette);
+
+      const errR = (r - pr) / 48;
+      const errG = (g - pg) / 48;
+      const errB = (b - pb) / 48;
+
+      data[idx] = pr;
+      data[idx + 1] = pg;
+      data[idx + 2] = pb;
+
+      // JJN kernel (48-normalized):
+      //          X  7  5
+      //      3  5  7  5  3
+      //      1  3  5  3  1
+      if (x < width - 1) {
+        errorBuffer[errIdx + 3] += errR * 7;
+        errorBuffer[errIdx + 4] += errG * 7;
+        errorBuffer[errIdx + 5] += errB * 7;
+      }
+      if (x < width - 2) {
+        errorBuffer[errIdx + 6] += errR * 5;
+        errorBuffer[errIdx + 7] += errG * 5;
+        errorBuffer[errIdx + 8] += errB * 5;
+      }
+
+      if (y < height - 1) {
+        if (x > 0) {
+          errorBuffer[nextBufStart + (x + 2) * 3] += errR * 3;
+          errorBuffer[nextBufStart + (x + 2) * 3 + 1] += errG * 3;
+          errorBuffer[nextBufStart + (x + 2) * 3 + 2] += errB * 3;
+        }
+        errorBuffer[nextBufStart + (x + 3) * 3] += errR * 5;
+        errorBuffer[nextBufStart + (x + 3) * 3 + 1] += errG * 5;
+        errorBuffer[nextBufStart + (x + 3) * 3 + 2] += errB * 5;
+        if (x < width - 1) {
+          errorBuffer[nextBufStart + (x + 4) * 3] += errR * 7;
+          errorBuffer[nextBufStart + (x + 4) * 3 + 1] += errG * 7;
+          errorBuffer[nextBufStart + (x + 4) * 3 + 2] += errB * 7;
+        }
+        if (x < width - 2) {
+          errorBuffer[nextBufStart + (x + 5) * 3] += errR * 5;
+          errorBuffer[nextBufStart + (x + 5) * 3 + 1] += errG * 5;
+          errorBuffer[nextBufStart + (x + 5) * 3 + 2] += errB * 5;
+        }
+        if (x > 0) {
+          errorBuffer[nextBufStart + (x + 1) * 3] += errR * 3;
+          errorBuffer[nextBufStart + (x + 1) * 3 + 1] += errG * 3;
+          errorBuffer[nextBufStart + (x + 1) * 3 + 2] += errB * 3;
+        }
+      }
+
+      if (y < height - 2) {
+        if (x > 0) {
+          errorBuffer[nextNextBufStart + (x + 2) * 3] += errR;
+          errorBuffer[nextNextBufStart + (x + 2) * 3 + 1] += errG;
+          errorBuffer[nextNextBufStart + (x + 2) * 3 + 2] += errB;
+        }
+        errorBuffer[nextNextBufStart + (x + 3) * 3] += errR * 3;
+        errorBuffer[nextNextBufStart + (x + 3) * 3 + 1] += errG * 3;
+        errorBuffer[nextNextBufStart + (x + 3) * 3 + 2] += errB * 3;
+        if (x < width - 1) {
+          errorBuffer[nextNextBufStart + (x + 4) * 3] += errR * 5;
+          errorBuffer[nextNextBufStart + (x + 4) * 3 + 1] += errG * 5;
+          errorBuffer[nextNextBufStart + (x + 4) * 3 + 2] += errB * 5;
+        }
+        if (x < width - 2) {
+          errorBuffer[nextNextBufStart + (x + 5) * 3] += errR * 3;
+          errorBuffer[nextNextBufStart + (x + 5) * 3 + 1] += errG * 3;
+          errorBuffer[nextNextBufStart + (x + 5) * 3 + 2] += errB * 3;
+        }
+        if (x > 0) {
+          errorBuffer[nextNextBufStart + (x + 1) * 3] += errR;
+          errorBuffer[nextNextBufStart + (x + 1) * 3 + 1] += errG;
+          errorBuffer[nextNextBufStart + (x + 1) * 3 + 2] += errB;
+        }
+      }
+    }
+
+    currentRow = nextRow;
+  }
+}
+
+/**
+ * Apply Stucki dithering (5x5 kernel)
+ * Similar quality to JJN but with slightly different distribution
+ */
+export function applyStuckiDithering(
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  palette: [number, number, number][],
+  intensity: number = 1.0,
+  resolution: number = 1.0
+): void {
+  if (resolution < 1) {
+    applyDitheringAtLowerResolution(data, width, height, palette, intensity, resolution, 'stucki');
+    return;
+  }
+
+  const errorBuffer = new Float32Array((width + 4) * 3 * 2);
+  let currentRow = 0;
+
+  for (let y = 0; y < height; y++) {
+    const nextRow = 1 - currentRow;
+
+    for (let i = nextRow * (width + 4) * 3; i < (nextRow + 1) * (width + 4) * 3; i++) {
+      errorBuffer[i] = 0;
+    }
+
+    const currentBufStart = currentRow * (width + 4) * 3;
+    const nextBufStart = nextRow * (width + 4) * 3;
+
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+      const errIdx = currentBufStart + (x + 2) * 3;
+
+      let r = Math.max(0, Math.min(255, data[idx] + errorBuffer[errIdx] * intensity));
+      let g = Math.max(0, Math.min(255, data[idx + 1] + errorBuffer[errIdx + 1] * intensity));
+      let b = Math.max(0, Math.min(255, data[idx + 2] + errorBuffer[errIdx + 2] * intensity));
+
+      const [pr, pg, pb] = findNearestColor(r | 0, g | 0, b | 0, palette);
+
+      const errR = (r - pr) / 42;
+      const errG = (g - pg) / 42;
+      const errB = (b - pb) / 42;
+
+      data[idx] = pr;
+      data[idx + 1] = pg;
+      data[idx + 2] = pb;
+
+      // Stucki kernel (42-normalized):
+      //        X  8  4
+      //     2  4  8  4  2
+      if (x < width - 1) {
+        errorBuffer[errIdx + 3] += errR * 8;
+        errorBuffer[errIdx + 4] += errG * 8;
+        errorBuffer[errIdx + 5] += errB * 8;
+      }
+      if (x < width - 2) {
+        errorBuffer[errIdx + 6] += errR * 4;
+        errorBuffer[errIdx + 7] += errG * 4;
+        errorBuffer[errIdx + 8] += errB * 4;
+      }
+
+      if (y < height - 1) {
+        if (x > 0) {
+          errorBuffer[nextBufStart + (x + 1) * 3] += errR * 2;
+          errorBuffer[nextBufStart + (x + 1) * 3 + 1] += errG * 2;
+          errorBuffer[nextBufStart + (x + 1) * 3 + 2] += errB * 2;
+        }
+        errorBuffer[nextBufStart + (x + 2) * 3] += errR * 4;
+        errorBuffer[nextBufStart + (x + 2) * 3 + 1] += errG * 4;
+        errorBuffer[nextBufStart + (x + 2) * 3 + 2] += errB * 4;
+        if (x < width - 1) {
+          errorBuffer[nextBufStart + (x + 3) * 3] += errR * 8;
+          errorBuffer[nextBufStart + (x + 3) * 3 + 1] += errG * 8;
+          errorBuffer[nextBufStart + (x + 3) * 3 + 2] += errB * 8;
+        }
+        if (x < width - 2) {
+          errorBuffer[nextBufStart + (x + 4) * 3] += errR * 4;
+          errorBuffer[nextBufStart + (x + 4) * 3 + 1] += errG * 4;
+          errorBuffer[nextBufStart + (x + 4) * 3 + 2] += errB * 4;
+        }
+        if (x < width - 3) {
+          errorBuffer[nextBufStart + (x + 5) * 3] += errR * 2;
+          errorBuffer[nextBufStart + (x + 5) * 3 + 1] += errG * 2;
+          errorBuffer[nextBufStart + (x + 5) * 3 + 2] += errB * 2;
+        }
+      }
+    }
+
+    currentRow = nextRow;
+  }
+}
+
+/**
+ * Apply Sierra dithering (3-pass variant, 5x5 kernel)
+ * Good balance between quality and speed
+ */
+export function applySierraDithering(
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  palette: [number, number, number][],
+  intensity: number = 1.0,
+  resolution: number = 1.0
+): void {
+  if (resolution < 1) {
+    applyDitheringAtLowerResolution(data, width, height, palette, intensity, resolution, 'sierra');
+    return;
+  }
+
+  const errorBuffer = new Float32Array((width + 4) * 3 * 2);
+  let currentRow = 0;
+
+  for (let y = 0; y < height; y++) {
+    const nextRow = 1 - currentRow;
+
+    for (let i = nextRow * (width + 4) * 3; i < (nextRow + 1) * (width + 4) * 3; i++) {
+      errorBuffer[i] = 0;
+    }
+
+    const currentBufStart = currentRow * (width + 4) * 3;
+    const nextBufStart = nextRow * (width + 4) * 3;
+
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+      const errIdx = currentBufStart + (x + 2) * 3;
+
+      let r = Math.max(0, Math.min(255, data[idx] + errorBuffer[errIdx] * intensity));
+      let g = Math.max(0, Math.min(255, data[idx + 1] + errorBuffer[errIdx + 1] * intensity));
+      let b = Math.max(0, Math.min(255, data[idx + 2] + errorBuffer[errIdx + 2] * intensity));
+
+      const [pr, pg, pb] = findNearestColor(r | 0, g | 0, b | 0, palette);
+
+      const errR = (r - pr) / 32;
+      const errG = (g - pg) / 32;
+      const errB = (b - pb) / 32;
+
+      data[idx] = pr;
+      data[idx + 1] = pg;
+      data[idx + 2] = pb;
+
+      // Sierra kernel (32-normalized):
+      //       X  5  3
+      //     2  4  5  4  2
+      if (x < width - 1) {
+        errorBuffer[errIdx + 3] += errR * 5;
+        errorBuffer[errIdx + 4] += errG * 5;
+        errorBuffer[errIdx + 5] += errB * 5;
+      }
+      if (x < width - 2) {
+        errorBuffer[errIdx + 6] += errR * 3;
+        errorBuffer[errIdx + 7] += errG * 3;
+        errorBuffer[errIdx + 8] += errB * 3;
+      }
+
+      if (y < height - 1) {
+        if (x > 0) {
+          errorBuffer[nextBufStart + (x + 1) * 3] += errR * 2;
+          errorBuffer[nextBufStart + (x + 1) * 3 + 1] += errG * 2;
+          errorBuffer[nextBufStart + (x + 1) * 3 + 2] += errB * 2;
+        }
+        errorBuffer[nextBufStart + (x + 2) * 3] += errR * 4;
+        errorBuffer[nextBufStart + (x + 2) * 3 + 1] += errG * 4;
+        errorBuffer[nextBufStart + (x + 2) * 3 + 2] += errB * 4;
+        if (x < width - 1) {
+          errorBuffer[nextBufStart + (x + 3) * 3] += errR * 5;
+          errorBuffer[nextBufStart + (x + 3) * 3 + 1] += errG * 5;
+          errorBuffer[nextBufStart + (x + 3) * 3 + 2] += errB * 5;
+        }
+        if (x < width - 2) {
+          errorBuffer[nextBufStart + (x + 4) * 3] += errR * 4;
+          errorBuffer[nextBufStart + (x + 4) * 3 + 1] += errG * 4;
+          errorBuffer[nextBufStart + (x + 4) * 3 + 2] += errB * 4;
+        }
+        if (x < width - 3) {
+          errorBuffer[nextBufStart + (x + 5) * 3] += errR * 2;
+          errorBuffer[nextBufStart + (x + 5) * 3 + 1] += errG * 2;
+          errorBuffer[nextBufStart + (x + 5) * 3 + 2] += errB * 2;
+        }
+      }
+    }
+
+    currentRow = nextRow;
+  }
+}
 function applyDitheringAtLowerResolution(
   data: Uint8ClampedArray,
   width: number,
@@ -153,7 +477,7 @@ function applyDitheringAtLowerResolution(
   palette: [number, number, number][],
   intensity: number,
   resolution: number,
-  type: 'bayer' | 'floydSteinberg'
+  type: 'bayer' | 'floydSteinberg' | 'jjn' | 'stucki' | 'sierra'
 ): void {
   // Calculate lower resolution dimensions
   const scaledWidth = Math.max(2, Math.floor(width * resolution));
@@ -196,8 +520,14 @@ function applyDitheringAtLowerResolution(
   // Apply dithering to scaled data
   if (type === 'bayer') {
     applyBayerDithering(scaledData, scaledWidth, scaledHeight, palette, intensity, 1.0);
-  } else {
+  } else if (type === 'floydSteinberg') {
     applyFloydSteinbergDithering(scaledData, scaledWidth, scaledHeight, palette, intensity, 1.0);
+  } else if (type === 'jjn') {
+    applyJJNDithering(scaledData, scaledWidth, scaledHeight, palette, intensity, 1.0);
+  } else if (type === 'stucki') {
+    applyStuckiDithering(scaledData, scaledWidth, scaledHeight, palette, intensity, 1.0);
+  } else if (type === 'sierra') {
+    applySierraDithering(scaledData, scaledWidth, scaledHeight, palette, intensity, 1.0);
   }
 
   // Upscale back to original resolution using nearest-neighbor

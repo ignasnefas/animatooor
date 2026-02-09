@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { AnimatedShapes } from './AnimatedShapes';
 import { AnimationSettings } from '../types';
 import { imageDataToASCIICells, renderASCIIToCanvas } from '../utils/asciiRenderer';
-import { applyBayerDithering, applyFloydSteinbergDithering, reduceColorsTopalette } from '../utils/dithering';
+import { applyBayerDithering, applyFloydSteinbergDithering, applyJJNDithering, applyStuckiDithering, applySierraDithering, reduceColorsTopalette } from '../utils/dithering';
 import { palettes } from '../utils/palettes';
 import { applyPixelation } from '../utils/pixelation';
 
@@ -200,8 +200,14 @@ const RetroEffects = memo(function RetroEffects({
         if (ditheringEnabled) {
           if (ditheringType === 'bayer') {
             applyBayerDithering(imageData.data, w, h, palette, ditheringIntensity, ditheringResolution);
-          } else {
+          } else if (ditheringType === 'floydSteinberg') {
             applyFloydSteinbergDithering(imageData.data, w, h, palette, ditheringIntensity, ditheringResolution);
+          } else if (ditheringType === 'jjn') {
+            applyJJNDithering(imageData.data, w, h, palette, ditheringIntensity, ditheringResolution);
+          } else if (ditheringType === 'stucki') {
+            applyStuckiDithering(imageData.data, w, h, palette, ditheringIntensity, ditheringResolution);
+          } else if (ditheringType === 'sierra') {
+            applySierraDithering(imageData.data, w, h, palette, ditheringIntensity, ditheringResolution);
           }
         } else {
           // Just reduce colors without dithering
