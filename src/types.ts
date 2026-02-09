@@ -14,7 +14,8 @@ export interface AnimationSettings {
   wireframe: boolean;
   metalness: number;
   roughness: number;
-  geometryDetail: number; // 0-3, controls subdivision/detail level of shapes
+  geometryDetail: number; // 0-6, controls subdivision/detail level of shapes
+  reflectionsEnabled: boolean; // toggle environment reflections on/off
 
   // Animation
   animationType: AnimationType;

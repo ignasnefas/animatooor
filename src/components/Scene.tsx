@@ -507,7 +507,9 @@ export const Scene = forwardRef<SceneHandle, SceneProps>(function Scene({ settin
           shapeColor2={settings.shapeColor2}
         />
         <AnimatedShapes settings={settings} isPaused={isPaused} />
-        <Environment preset="city" environmentIntensity={0.2} />
+        {settings.reflectionsEnabled && (
+          <Environment preset="city" environmentIntensity={0.2} />
+        )}
         {!settings.cameraAutoRotate && (
           <OrbitControls
             enablePan={false}

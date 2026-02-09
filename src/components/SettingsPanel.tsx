@@ -280,8 +280,9 @@ export function SettingsPanel({
           />
           <SliderControl label="Count" value={settings.shapeCount} min={1} max={30} step={1} onChange={(v) => update({ shapeCount: v })} />
           <SliderControl label="Scale" value={settings.shapeScale} min={0.1} max={3} step={0.1} onChange={(v) => update({ shapeScale: v })} />
-          <SliderControl label="Detail Level" value={settings.geometryDetail} min={0} max={3} step={1} onChange={(v) => update({ geometryDetail: v })} />
+          <SliderControl label="Detail Level" value={settings.geometryDetail} min={0} max={6} step={1} onChange={(v) => update({ geometryDetail: v })} />
           <ToggleControl label="Wireframe" value={settings.wireframe} onChange={(v) => update({ wireframe: v })} />
+          <ToggleControl label="Reflections" value={settings.reflectionsEnabled} onChange={(v) => update({ reflectionsEnabled: v })} />
           <SliderControl label="Metalness" value={settings.metalness} min={0} max={1} step={0.05} onChange={(v) => update({ metalness: v })} />
           <SliderControl label="Roughness" value={settings.roughness} min={0} max={1} step={0.05} onChange={(v) => update({ roughness: v })} />
         </Section>

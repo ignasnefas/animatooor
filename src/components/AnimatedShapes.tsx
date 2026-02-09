@@ -4,9 +4,9 @@ import * as THREE from 'three';
 import { AnimationSettings, GeometryType } from '../types';
 
 function createGeometry(type: GeometryType, detail: number = 1): THREE.BufferGeometry {
-  // Detail affects subdivision level (0-3)
-  const segments = Math.max(4, 8 + detail * 8); // 8, 16, 24, 32
-  const radialSegments = Math.max(3, 6 + detail * 6); // 6, 12, 18, 24
+  // Detail affects subdivision level (0-6)
+  const segments = Math.max(4, 8 + detail * 8); // 8, 16, 24, 32, 40, 48, 56
+  const radialSegments = Math.max(3, 6 + detail * 6); // 6, 12, 18, 24, 30, 36, 42
   
   switch (type) {
     case 'torus':
@@ -416,9 +416,16 @@ function Shape({ settings, index, total, isPaused = false }: ShapeProps) {
       }
       case 'simpleRotation': {
         // Simple rotation around selected axis without position changes
-        meshRef.current.position.x = Math.cos(offset) * spread * 0.2 * hAmp;
-        meshRef.current.position.y = Math.sin(offset) * spread * 0.2 * vAmp;
-        meshRef.current.position.z = 0;
+        // For single shape, center it at origin; for multiple shapes, arrange in circle
+        if (total === 1) {
+          meshRef.current.position.x = 0;
+          meshRef.current.position.y = 0;
+          meshRef.current.position.z = 0;
+        } else {
+          meshRef.current.position.x = Math.cos(offset) * spread * 0.2 * hAmp;
+          meshRef.current.position.y = Math.sin(offset) * spread * 0.2 * vAmp;
+          meshRef.current.position.z = 0;
+        }
         
         // Reset all rotations first
         meshRef.current.rotation.x = 0;

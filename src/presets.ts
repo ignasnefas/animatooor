@@ -14,6 +14,7 @@ export const defaultSettings: AnimationSettings = {
   metalness: 0.8,
   roughness: 0.2,
   geometryDetail: 1,
+  reflectionsEnabled: true,
   animationType: 'orbit',
   loopDuration: 4,
   speed: 1,
@@ -53,7 +54,7 @@ export const defaultSettings: AnimationSettings = {
   pixelSize: 4,
   exportWidth: 1080,
   exportHeight: 1080,
-  exportFps: 30,
+  exportFps: 60,
   exportFormat: 'webm',
   exportQuality: 'excellent',
   exportLoopCount: 1,
@@ -61,6 +62,30 @@ export const defaultSettings: AnimationSettings = {
 };
 
 export const presets: Preset[] = [
+  {
+    id: 'simple-torus-rotation',
+    name: 'Simple Torus Rotation',
+    description: 'Clean torus with simple Y-axis rotation',
+    thumbnail: '🔄',
+    settings: {
+      geometryType: 'torus',
+      shapeCount: 1,
+      shapeScale: 1.2,
+      geometryDetail: 6,
+      shapeColor: '#8b5cf6',
+      shapeColor2: '#06b6d4',
+      animationType: 'simpleRotation',
+      rotationAxis: 'y',
+      loopDuration: 4,
+      cameraPreset: 'front',
+      cameraDistance: 5,
+      metalness: 0.7,
+      roughness: 0.3,
+      backgroundColor: '#0a0a0f',
+      backgroundGradientColor: '#1a0a2e',
+      seamlessLoopVerification: true,
+    },
+  },
   {
     id: 'cosmic-torus',
     name: 'Cosmic Torus',
