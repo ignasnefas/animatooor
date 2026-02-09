@@ -409,8 +409,6 @@ const ResolutionBorders = memo(function ResolutionBorders({
     return () => window.removeEventListener('resize', handleResize);
   }, [containerRef]);
 
-  if (dimensions.width === 0 || dimensions.height === 0) return null;
-
   const aspectRatio = exportWidth / exportHeight;
   const screenWidth = dimensions.width;
   const screenHeight = dimensions.height;
@@ -443,6 +441,8 @@ const ResolutionBorders = memo(function ResolutionBorders({
       height: `${borderHeight}px`,
     };
   }, [aspectRatio, screenWidth, screenHeight]);
+
+  if (dimensions.width === 0 || dimensions.height === 0) return null;
 
   return (
     <div

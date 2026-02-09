@@ -439,13 +439,58 @@ export function SettingsPanel({
 
         {/* Export */}
         <Section title="Export" icon={Download} defaultOpen={false}>
+          <div className="mb-3">
+            <label className="text-xs text-white/60 mb-2 block">Resolution Presets</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => update({ exportWidth: 1080, exportHeight: 1920 })}
+                className={`p-2 rounded-lg text-xs font-medium transition-colors border ${
+                  settings.exportWidth === 1080 && settings.exportHeight === 1920
+                    ? 'bg-pink-500/20 border-pink-500/50 text-pink-300'
+                    : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'
+                }`}
+              >
+                📱 Story (1080×1920)
+              </button>
+              <button
+                onClick={() => update({ exportWidth: 1080, exportHeight: 1080 })}
+                className={`p-2 rounded-lg text-xs font-medium transition-colors border ${
+                  settings.exportWidth === 1080 && settings.exportHeight === 1080
+                    ? 'bg-pink-500/20 border-pink-500/50 text-pink-300'
+                    : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'
+                }`}
+              >
+                📷 Feed (1080×1080)
+              </button>
+              <button
+                onClick={() => update({ exportWidth: 1920, exportHeight: 1080 })}
+                className={`p-2 rounded-lg text-xs font-medium transition-colors border ${
+                  settings.exportWidth === 1920 && settings.exportHeight === 1080
+                    ? 'bg-blue-500/20 border-blue-500/50 text-blue-300'
+                    : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'
+                }`}
+              >
+                🎬 Landscape (1920×1080)
+              </button>
+              <button
+                onClick={() => update({ exportWidth: 2160, exportHeight: 2160 })}
+                className={`p-2 rounded-lg text-xs font-medium transition-colors border ${
+                  settings.exportWidth === 2160 && settings.exportHeight === 2160
+                    ? 'bg-purple-500/20 border-purple-500/50 text-purple-300'
+                    : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'
+                }`}
+              >
+                🔥 4K (2160×2160)
+              </button>
+            </div>
+          </div>
           <SelectControl
-            label="Resolution"
+            label="Custom Resolution"
             value={`${settings.exportWidth}x${settings.exportHeight}`}
             options={[
               { value: '720x720', label: '720 × 720 (Square)' },
-              { value: '1080x1080', label: '1080 × 1080 (Instagram)' },
-              { value: '1080x1920', label: '1080 × 1920 (Story/Reel)' },
+              { value: '1080x1080', label: '1080 × 1080 (Square)' },
+              { value: '1080x1920', label: '1080 × 1920 (Vertical - Instagram Story)' },
               { value: '1920x1080', label: '1920 × 1080 (Landscape)' },
               { value: '2160x2160', label: '2160 × 2160 (4K Square)' },
             ]}
