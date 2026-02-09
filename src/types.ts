@@ -17,6 +17,14 @@ export interface AnimationSettings {
   geometryDetail: number; // 0-6, controls subdivision/detail level of shapes
   reflectionsEnabled: boolean; // toggle environment reflections on/off
 
+  // 3D Text
+  textContent: string;
+  textFont: TextFont;
+  textDepth: number; // extrusion depth
+  textBevel: boolean;
+  textBevelThickness: number;
+  textBevelSize: number;
+
   // Animation
   animationType: AnimationType;
   loopDuration: number; // seconds for one complete loop
@@ -93,7 +101,8 @@ export type GeometryType =
   | 'spiral'
   | 'heart'
   | 'diamond'
-  | 'crystal';
+  | 'crystal'
+  | 'text3d';
 
 export type AnimationType =
   | 'orbit'
@@ -113,7 +122,39 @@ export type AnimationType =
   | 'helix'
   | 'ripple'
   | 'swirl'
-  | 'simpleRotation';
+  | 'simpleRotation'
+  | 'sineScroller'
+  | 'starfield'
+  | 'copperbars'
+  | 'bobs'
+  | 'tunnel'
+  | 'rasterbars'
+  | 'plasma';
+
+export type TextFont =
+  | 'helvetiker'
+  | 'helvetiker_bold'
+  | 'optimer'
+  | 'optimer_bold'
+  | 'gentilis'
+  | 'gentilis_bold'
+  | 'droid_sans'
+  | 'droid_sans_bold'
+  | 'droid_serif'
+  | 'droid_serif_bold';
+
+export const TEXT_FONT_URLS: Record<TextFont, string> = {
+  helvetiker: 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r169/examples/fonts/helvetiker_regular.typeface.json',
+  helvetiker_bold: 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r169/examples/fonts/helvetiker_bold.typeface.json',
+  optimer: 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r169/examples/fonts/optimer_regular.typeface.json',
+  optimer_bold: 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r169/examples/fonts/optimer_bold.typeface.json',
+  gentilis: 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r169/examples/fonts/gentilis_regular.typeface.json',
+  gentilis_bold: 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r169/examples/fonts/gentilis_bold.typeface.json',
+  droid_sans: 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r169/examples/fonts/droid/droid_sans_regular.typeface.json',
+  droid_sans_bold: 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r169/examples/fonts/droid/droid_sans_bold.typeface.json',
+  droid_serif: 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r169/examples/fonts/droid/droid_serif_regular.typeface.json',
+  droid_serif_bold: 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r169/examples/fonts/droid/droid_serif_bold.typeface.json',
+};
 
 export interface Preset {
   id: string;

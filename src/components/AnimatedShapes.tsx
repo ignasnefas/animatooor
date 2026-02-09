@@ -1,7 +1,8 @@
-import { useRef, useMemo } from 'react';
+import { useRef, useMemo, Suspense } from 'react';
 import { useFrame } from '@react-three/fiber';
+import { Text3D, Center } from '@react-three/drei';
 import * as THREE from 'three';
-import { AnimationSettings, GeometryType } from '../types';
+import { AnimationSettings, GeometryType, TEXT_FONT_URLS } from '../types';
 
 function createGeometry(type: GeometryType, detail: number = 1): THREE.BufferGeometry {
   // Detail affects subdivision level (0-6)
@@ -157,36 +158,7 @@ interface ShapeProps {
   isPaused?: boolean;
 }
 
-function Shape({ settings, index, total, isPaused = false }: ShapeProps) {
-  const meshRef = useRef<THREE.Mesh>(null);
-
-  const geometry = useMemo(() => createGeometry(settings.geometryType, settings.geometryDetail), [settings.geometryType, settings.geometryDetail]);
-
-  const material = useMemo(() => {
-    const color1 = new THREE.Color(settings.shapeColor);
-    const color2 = new THREE.Color(settings.shapeColor2);
-    const mixedColor = color1.clone().lerp(color2, total > 1 ? index / (total - 1) : 0);
-
-    if (settings.wireframe) {
-      return new THREE.MeshStandardMaterial({
-        color: mixedColor,
-        wireframe: true,
-        emissive: mixedColor,
-        emissiveIntensity: 0.3,
-        metalness: settings.metalness,
-        roughness: settings.roughness,
-      });
-    }
-
-    return new THREE.MeshStandardMaterial({
-      color: mixedColor,
-      metalness: settings.metalness,
-      roughness: settings.roughness,
-      emissive: mixedColor,
-      emissiveIntensity: 0.15,
-    });
-  }, [settings.shapeColor, settings.shapeColor2, settings.wireframe, settings.metalness, settings.roughness, index, total]);
-
+function useShapeAnimation(meshRef: React.RefObject<THREE.Mesh | THREE.Group | null>, settings: AnimationSettings, index: number, total: number, isPaused: boolean) {
   useFrame(({ clock }) => {
     if (!meshRef.current || isPaused) return;
 
@@ -445,11 +417,218 @@ function Shape({ settings, index, total, isPaused = false }: ShapeProps) {
         }
         break;
       }
+
+      // === CRACKTRO / DEMOSCENE ANIMATION TYPES ===
+
+      case 'sineScroller': {
+        // Classic sine scroller: shapes scroll horizontally with sine-wave vertical offset
+        // Each shape is evenly spaced and wraps around
+        const scrollSpeed = phase * 2;
+        const spacing = spread * 0.6;
+        // Position wraps from right to left
+        const rawX = ((index * spacing - scrollSpeed * hAmp) % (total * spacing));
+        const scrollX = rawX > (total * spacing * 0.5) ? rawX - total * spacing : rawX;
+        const sineY = Math.sin(scrollX * freq * 0.8 + phase) * amp * vAmp;
+        meshRef.current.position.x = scrollX;
+        meshRef.current.position.y = sineY;
+        meshRef.current.position.z = 0;
+        meshRef.current.rotation.x = (phase + offset) * rotMult;
+        meshRef.current.rotation.y = (phase * 1.5 + offset) * rotMult;
+        meshRef.current.rotation.z = (phase * 0.5) * rotMult;
+        break;
+      }
+
+      case 'starfield': {
+        // Classic starfield: shapes fly towards the camera from deep z
+        // Use deterministic pseudo-random positions based on index
+        const seed1 = Math.sin(index * 127.1 + 311.7) * 0.5;
+        const seed2 = Math.cos(index * 269.5 + 183.3) * 0.5;
+        const starSpeed = (phase * 0.5 + index * 0.37) % (Math.PI * 2);
+        const starZ = (1 - starSpeed / (Math.PI * 2)) * spread * 3 - spread;
+        const starX = seed1 * spread * hAmp * 2;
+        const starY = seed2 * spread * vAmp * 2;
+        // Scale up as stars get closer
+        const starDepth = Math.max(0.1, 1 - (starZ + spread) / (spread * 4));
+        meshRef.current.position.x = starX * starDepth;
+        meshRef.current.position.y = starY * starDepth;
+        meshRef.current.position.z = starZ;
+        meshRef.current.scale.setScalar(starDepth * settings.shapeScale * amp);
+        meshRef.current.rotation.z = (phase * 2 + offset) * rotMult;
+        break;
+      }
+
+      case 'copperbars': {
+        // Classic copper bars: horizontal bars that wave up and down with sine patterns
+        const barY = Math.sin(phase * freq + index * 0.8) * amp * vAmp * 2;
+        const barX = Math.sin(phase * 0.7 + index * 1.2) * spread * 0.3 * hAmp;
+        meshRef.current.position.x = barX;
+        meshRef.current.position.y = barY;
+        meshRef.current.position.z = -index * 0.15;
+        // Scale X to make bar shapes
+        meshRef.current.scale.set(
+          settings.shapeScale * 3,
+          settings.shapeScale * 0.3,
+          settings.shapeScale * 0.3
+        );
+        meshRef.current.rotation.z = Math.sin(phase * 0.5 + index) * 0.1 * rotMult;
+        meshRef.current.rotation.x = 0;
+        meshRef.current.rotation.y = 0;
+        break;
+      }
+
+      case 'bobs': {
+        // Classic "bobs" effect: shapes following Lissajous-style sine patterns
+        // Each bob has a slightly different frequency creating mesmerizing patterns
+        const bobFreqX = freq + index * 0.15;
+        const bobFreqY = freq * 1.3 + index * 0.12;
+        const bobX = Math.sin(phase * bobFreqX + offset) * spread * 0.5 * hAmp;
+        const bobY = Math.cos(phase * bobFreqY + offset) * spread * 0.5 * vAmp;
+        const bobZ = Math.sin(phase * freq * 0.5 + offset * 2) * amp * 0.5;
+        meshRef.current.position.x = bobX;
+        meshRef.current.position.y = bobY;
+        meshRef.current.position.z = bobZ;
+        meshRef.current.rotation.x = (phase * 2 + offset) * rotMult;
+        meshRef.current.rotation.y = (phase * 3 + offset) * rotMult;
+        const bobScale = 0.8 + Math.sin(phase * 2 + offset) * 0.2;
+        meshRef.current.scale.setScalar(bobScale * settings.shapeScale);
+        break;
+      }
+
+      case 'tunnel': {
+        // Classic tunnel effect: shapes arranged in rings that zoom towards camera
+        const ringCount = Math.max(3, Math.floor(total / 3));
+        const ringIndex = index % ringCount;
+        const posInRing = Math.floor(index / ringCount);
+        const ringAngle = (posInRing / Math.max(1, Math.floor(total / ringCount))) * Math.PI * 2;
+        // Rings move towards camera and wrap around
+        const tunnelZ = ((phase * 0.8 + ringIndex * 1.5) % (ringCount * 1.5)) - ringCount * 0.75;
+        const tunnelRadius = spread * 0.4 * (1 + tunnelZ * 0.15);
+        meshRef.current.position.x = Math.cos(ringAngle + phase * 0.3) * tunnelRadius * hAmp;
+        meshRef.current.position.y = Math.sin(ringAngle + phase * 0.3) * tunnelRadius * vAmp;
+        meshRef.current.position.z = tunnelZ;
+        const tunnelScale = Math.max(0.2, 1 - Math.abs(tunnelZ) / (ringCount * 0.75));
+        meshRef.current.scale.setScalar(tunnelScale * settings.shapeScale * amp);
+        meshRef.current.rotation.z = (phase + ringAngle) * rotMult;
+        meshRef.current.rotation.x = phase * 0.5 * rotMult;
+        break;
+      }
+
+      case 'rasterbars': {
+        // Raster bars: multiple shapes moving in interleaved sine waves like old Amiga raster effects
+        const rasterPhase = phase * freq;
+        const rasterY = (index - total / 2) * spread * 0.2;
+        const rasterX = Math.sin(rasterPhase + index * 0.5) * spread * hAmp;
+        const rasterZ = Math.cos(rasterPhase * 0.7 + index * 0.3) * amp * 0.5;
+        meshRef.current.position.x = rasterX;
+        meshRef.current.position.y = rasterY + Math.sin(rasterPhase + index * 0.8) * amp * 0.3 * vAmp;
+        meshRef.current.position.z = rasterZ;
+        // Stretched horizontally like raster bars
+        meshRef.current.scale.set(
+          settings.shapeScale * 2.5,
+          settings.shapeScale * 0.4,
+          settings.shapeScale * 0.4
+        );
+        meshRef.current.rotation.y = Math.sin(rasterPhase * 0.3 + index) * 0.3 * rotMult;
+        meshRef.current.rotation.x = 0;
+        meshRef.current.rotation.z = Math.sin(rasterPhase * 0.2 + index * 0.4) * 0.15 * rotMult;
+        break;
+      }
+
+      case 'plasma': {
+        // Plasma: shapes arranged in a grid-like pattern with plasma-style sine movement
+        const gridSize = Math.max(2, Math.ceil(Math.sqrt(total)));
+        const gridX = (index % gridSize) - gridSize / 2;
+        const gridY = Math.floor(index / gridSize) - gridSize / 2;
+        const plasmaX = gridX * spread * 0.3 * hAmp;
+        const plasmaY = gridY * spread * 0.3 * vAmp;
+        // Plasma displacement
+        const plasmaDisp = Math.sin(gridX * freq + phase * 2) * Math.cos(gridY * freq + phase * 1.5) * amp;
+        const plasmaZ = plasmaDisp;
+        meshRef.current.position.x = plasmaX + Math.sin(phase + gridY * 0.5) * 0.3;
+        meshRef.current.position.y = plasmaY + Math.cos(phase + gridX * 0.5) * 0.3;
+        meshRef.current.position.z = plasmaZ;
+        const plasmaScale = 0.6 + Math.sin(phase * 2 + gridX + gridY) * 0.3;
+        meshRef.current.scale.setScalar(plasmaScale * settings.shapeScale);
+        meshRef.current.rotation.x = (phase + gridX * 0.5) * rotMult;
+        meshRef.current.rotation.y = (phase + gridY * 0.5) * rotMult;
+        meshRef.current.rotation.z = (phase * 0.5) * rotMult;
+        break;
+      }
     }
   });
+}
+
+function useMaterialForShape(settings: AnimationSettings, index: number, total: number) {
+  return useMemo(() => {
+    const color1 = new THREE.Color(settings.shapeColor);
+    const color2 = new THREE.Color(settings.shapeColor2);
+    const mixedColor = color1.clone().lerp(color2, total > 1 ? index / (total - 1) : 0);
+
+    if (settings.wireframe) {
+      return new THREE.MeshStandardMaterial({
+        color: mixedColor,
+        wireframe: true,
+        emissive: mixedColor,
+        emissiveIntensity: 0.3,
+        metalness: settings.metalness,
+        roughness: settings.roughness,
+      });
+    }
+
+    return new THREE.MeshStandardMaterial({
+      color: mixedColor,
+      metalness: settings.metalness,
+      roughness: settings.roughness,
+      emissive: mixedColor,
+      emissiveIntensity: 0.15,
+    });
+  }, [settings.shapeColor, settings.shapeColor2, settings.wireframe, settings.metalness, settings.roughness, index, total]);
+}
+
+function Shape({ settings, index, total, isPaused = false }: ShapeProps) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const geometry = useMemo(() => createGeometry(settings.geometryType, settings.geometryDetail), [settings.geometryType, settings.geometryDetail]);
+  const material = useMaterialForShape(settings, index, total);
+  useShapeAnimation(meshRef, settings, index, total, isPaused);
 
   return (
     <mesh ref={meshRef} geometry={geometry} material={material} scale={settings.shapeScale} />
+  );
+}
+
+function TextShapeInner({ settings, index, total, isPaused = false }: ShapeProps) {
+  const groupRef = useRef<THREE.Group>(null);
+  const material = useMaterialForShape(settings, index, total);
+  useShapeAnimation(groupRef, settings, index, total, isPaused);
+
+  const fontUrl = TEXT_FONT_URLS[settings.textFont] || TEXT_FONT_URLS.helvetiker_bold;
+
+  return (
+    <group ref={groupRef} scale={settings.shapeScale}>
+      <Center>
+        <Text3D
+          font={fontUrl}
+          size={0.8}
+          height={settings.textDepth}
+          curveSegments={8}
+          bevelEnabled={settings.textBevel}
+          bevelThickness={settings.textBevelThickness}
+          bevelSize={settings.textBevelSize}
+          bevelSegments={3}
+          material={material}
+        >
+          {settings.textContent || 'TEXT'}
+        </Text3D>
+      </Center>
+    </group>
+  );
+}
+
+function TextShape(props: ShapeProps) {
+  return (
+    <Suspense fallback={null}>
+      <TextShapeInner {...props} />
+    </Suspense>
   );
 }
 
@@ -459,11 +638,14 @@ interface AnimatedShapesProps {
 }
 
 export function AnimatedShapes({ settings, isPaused = false }: AnimatedShapesProps) {
+  const isText = settings.geometryType === 'text3d';
+  const ShapeComponent = isText ? TextShape : Shape;
+
   const shapes = useMemo(() => {
     return Array.from({ length: settings.shapeCount }, (_, i) => (
-      <Shape key={`${i}-${settings.geometryType}-${settings.shapeCount}`} settings={settings} index={i} total={settings.shapeCount} isPaused={isPaused} />
+      <ShapeComponent key={`${i}-${settings.geometryType}-${settings.shapeCount}-${isText ? settings.textContent + settings.textFont : ''}`} settings={settings} index={i} total={settings.shapeCount} isPaused={isPaused} />
     ));
-  }, [settings, isPaused]);
+  }, [settings, isPaused, ShapeComponent, isText]);
 
   return <>{shapes}</>;
 }

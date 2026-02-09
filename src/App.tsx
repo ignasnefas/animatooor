@@ -25,7 +25,7 @@ export function App() {
   }, [exportVideo, settings]);
 
   const handleApplyPreset = useCallback((preset: Preset) => {
-    setSettings((prev) => ({ ...prev, ...preset.settings }));
+    setSettings({ ...defaultSettings, ...preset.settings });
   }, []);
 
   const handleReset = useCallback(() => {

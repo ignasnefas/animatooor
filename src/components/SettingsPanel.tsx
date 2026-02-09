@@ -1,4 +1,4 @@
-import { AnimationSettings, GeometryType, AnimationType } from '../types';
+import { AnimationSettings, GeometryType, AnimationType, TextFont } from '../types';
 import { Preset } from '../types';
 import { presets } from '../presets';
 import { paletteList } from '../utils/palettes';
@@ -56,6 +56,20 @@ const geometryTypes: { value: GeometryType; label: string }[] = [
   { value: 'heart', label: 'Heart' },
   { value: 'diamond', label: 'Diamond' },
   { value: 'crystal', label: 'Crystal' },
+  { value: 'text3d', label: '✦ 3D Text' },
+];
+
+const textFonts: { value: TextFont; label: string }[] = [
+  { value: 'helvetiker', label: 'Helvetiker' },
+  { value: 'helvetiker_bold', label: 'Helvetiker Bold' },
+  { value: 'optimer', label: 'Optimer' },
+  { value: 'optimer_bold', label: 'Optimer Bold' },
+  { value: 'gentilis', label: 'Gentilis' },
+  { value: 'gentilis_bold', label: 'Gentilis Bold' },
+  { value: 'droid_sans', label: 'Droid Sans' },
+  { value: 'droid_sans_bold', label: 'Droid Sans Bold' },
+  { value: 'droid_serif', label: 'Droid Serif' },
+  { value: 'droid_serif_bold', label: 'Droid Serif Bold' },
 ];
 
 const animationTypes: { value: AnimationType; label: string }[] = [
@@ -77,6 +91,13 @@ const animationTypes: { value: AnimationType; label: string }[] = [
   { value: 'ripple', label: 'Ripple' },
   { value: 'swirl', label: 'Swirl' },
   { value: 'simpleRotation', label: 'Simple Rotation' },
+  { value: 'sineScroller', label: '◆ Sine Scroller' },
+  { value: 'starfield', label: '◆ Starfield' },
+  { value: 'copperbars', label: '◆ Copper Bars' },
+  { value: 'bobs', label: '◆ Bobs' },
+  { value: 'tunnel', label: '◆ Tunnel' },
+  { value: 'rasterbars', label: '◆ Raster Bars' },
+  { value: 'plasma', label: '◆ Plasma' },
 ];
 
 function Section({ title, icon: Icon, children, defaultOpen = true }: {
@@ -201,6 +222,27 @@ function ToggleControl({ label, value, onChange }: {
   );
 }
 
+function TextInputControl({ label, value, onChange, maxLength = 20 }: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  maxLength?: number;
+}) {
+  return (
+    <div>
+      <label className="text-xs text-white/60 mb-1 block">{label}</label>
+      <input
+        type="text"
+        value={value}
+        maxLength={maxLength}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white/90
+          focus:outline-none focus:border-violet-500/50"
+      />
+    </div>
+  );
+}
+
 export function SettingsPanel({
   settings,
   onSettingsChange,
@@ -285,6 +327,28 @@ export function SettingsPanel({
           <ToggleControl label="Reflections" value={settings.reflectionsEnabled} onChange={(v) => update({ reflectionsEnabled: v })} />
           <SliderControl label="Metalness" value={settings.metalness} min={0} max={1} step={0.05} onChange={(v) => update({ metalness: v })} />
           <SliderControl label="Roughness" value={settings.roughness} min={0} max={1} step={0.05} onChange={(v) => update({ roughness: v })} />
+          {settings.geometryType === 'text3d' && (
+            <>
+              <div className="pt-2 border-t border-white/5">
+                <span className="text-[10px] font-semibold text-violet-400 uppercase tracking-wider">3D Text</span>
+              </div>
+              <TextInputControl label="Text" value={settings.textContent} onChange={(v) => update({ textContent: v })} />
+              <SelectControl
+                label="Font"
+                value={settings.textFont}
+                options={textFonts}
+                onChange={(v) => update({ textFont: v as TextFont })}
+              />
+              <SliderControl label="Depth" value={settings.textDepth} min={0.05} max={1.5} step={0.05} onChange={(v) => update({ textDepth: v })} />
+              <ToggleControl label="Bevel" value={settings.textBevel} onChange={(v) => update({ textBevel: v })} />
+              {settings.textBevel && (
+                <>
+                  <SliderControl label="Bevel Thickness" value={settings.textBevelThickness} min={0.01} max={0.2} step={0.01} onChange={(v) => update({ textBevelThickness: v })} />
+                  <SliderControl label="Bevel Size" value={settings.textBevelSize} min={0.01} max={0.15} step={0.005} onChange={(v) => update({ textBevelSize: v })} />
+                </>
+              )}
+            </>
+          )}
         </Section>
 
         {/* Colors */}
